@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/v1")
+@RequestMapping("/api/v1")
 @CrossOrigin(origins = "*", maxAge = 3600)
 public class PromptController {
 
