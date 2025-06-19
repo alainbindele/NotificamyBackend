@@ -1,0 +1,43 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: notifyme-backend
+  
+  # Security settings
+  security:
+    require-ssl: false
+  
+  # Jackson settings
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+# OpenAI Configuration
+openai:
+  api:
+    key: ${OPENAI_API_KEY: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}
+    url: https://api.openai.com/v1/chat/completions
+
+# Logging
+logging:
+  level:
+    com.notifyme: INFO
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
