@@ -31,6 +31,7 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: https://${auth0.domain}/
+          audiences: https://notificamy.com/api
   
   # Jackson settings
   jackson:
@@ -68,3 +69,11 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+
+# CORS Configuration
+cors:
+  allowed-origins: https://notificamy.com
+  allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
