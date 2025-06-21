@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -28,15 +27,15 @@ public class PromptController {
     private ChatGptService chatGptService;
 
     @PostMapping("/validate-prompt")
-    public Mono<ResponseEntity<ApiResponse<String>>> processPrompt(@Valid @RequestBody PromptRequest request) {
+    public ResponseEntity<ApiResponse<String>> processPrompt(@Valid @RequestBody PromptRequest request) {
         logger.info("Received prompt request from email: {}", request.getEmail());
 
         try {
             // Validate prompt for security
             if (!securityService.isValidPrompt(request.getPrompt())) {
                 logger.warn("Invalid or potentially malicious prompt detected: {}", request.getPrompt());
-                return Mono.just(ResponseEntity.badRequest()
-                        .body(ApiResponse.error("Invalid prompt. Please check your input for security violations.")));
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Invalid prompt. Please check your input for security violations."));
             }
 
             // Sanitize input
@@ -44,36 +43,24 @@ public class PromptController {
             
             logger.info("Processing sanitized prompt: {}", sanitizedPrompt);
 
-            // Send to ChatGPT and handle response
-            return chatGptService.sendPromptToChatGpt(sanitizedPrompt)
-                    .map(this::handleChatGptResponse)
-                    .doOnSuccess(response -> logger.info("Request processed successfully"))
-                    .doOnError(error -> logger.error("Error in reactive stream: ", error))
-                    .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body(ApiResponse.<String>error("Error processing your request")));
-                            
-        } catch (Exception e) {
-            logger.error("Unexpected error in processPrompt: ", e);
-            return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<String>error("Unexpected error occurred")));
-        }
-    }
-
-    private ResponseEntity<ApiResponse<String>> handleChatGptResponse(ChatGptResponse response) {
-        try {
-            if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
-                String content = response.getChoices().get(0).getMessage().getContent();
+            // Send to ChatGPT synchronously
+            ChatGptResponse chatGptResponse = chatGptService.sendPromptToChatGptSync(sanitizedPrompt);
+            
+            if (chatGptResponse != null && chatGptResponse.getChoices() != null && !chatGptResponse.getChoices().isEmpty()) {
+                String content = chatGptResponse.getChoices().get(0).getMessage().getContent();
                 logger.info("ChatGPT response received successfully");
+                logger.info("Request processed successfully");
                 return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", content));
             } else {
                 logger.error("Empty or invalid response from ChatGPT");
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(ApiResponse.<String>error("No response from AI service"));
             }
+                            
         } catch (Exception e) {
-            logger.error("Error processing ChatGPT response: ", e);
+            logger.error("Error processing prompt: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<String>error("Error processing AI response"));
+                    .body(ApiResponse.<String>error("Error processing your request: " + e.getMessage()));
         }
     }
 
