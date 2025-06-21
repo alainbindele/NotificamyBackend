@@ -9,9 +9,9 @@ spring:
   
   # Database Configuration
   datasource:
-    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/notifyme?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
-    username: ${DATABASE_USERNAME:root}
-    password: ${DATABASE_PASSWORD:password}
+    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/NotificamyDB?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASS}
     driver-class-name: com.mysql.cj.jdbc.Driver
   
   # JPA Configuration

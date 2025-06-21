@@ -65,7 +65,7 @@ public class ChatGptService {
                         "detected":"{CRON|SPECIFIC}"
                         "cron_expression":"{CRON_ESPRESSION}",
                         "date_time":"{YYYY-MM-DD HH24:MI:SS}"
-                   }
+                   },
                    "validity": {
                      "out_of_bounds_prompt_length": true|false,
                      "offensive_language_detected": true|false,
