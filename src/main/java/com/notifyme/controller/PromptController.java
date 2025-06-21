@@ -29,9 +29,9 @@ public class PromptController {
 
     @PostMapping("/validate-prompt")
     public Mono<ResponseEntity<ApiResponse<String>>> processPrompt(@Valid @RequestBody PromptRequest request) {
-        try {
-            logger.info("Received prompt request from email: {}", request.getEmail());
+        logger.info("Received prompt request from email: {}", request.getEmail());
 
+        try {
             // Validate prompt for security
             if (!securityService.isValidPrompt(request.getPrompt())) {
                 logger.warn("Invalid or potentially malicious prompt detected: {}", request.getPrompt());
@@ -44,34 +44,36 @@ public class PromptController {
             
             logger.info("Processing sanitized prompt: {}", sanitizedPrompt);
 
-            // Send to ChatGPT
+            // Send to ChatGPT and handle response
             return chatGptService.sendPromptToChatGpt(sanitizedPrompt)
-                    .map(response -> {
-                        try {
-                            if (response.getChoices() != null && !response.getChoices().isEmpty()) {
-                                String content = response.getChoices().get(0).getMessage().getContent();
-                                logger.info("ChatGPT response received successfully");
-                                return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", content));
-                            } else {
-                                logger.error("Empty response from ChatGPT");
-                                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                        .body(ApiResponse.<String>error("No response from AI service"));
-                            }
-                        } catch (Exception e) {
-                            logger.error("Error processing ChatGPT response: ", e);
-                            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                    .body(ApiResponse.<String>error("Error processing AI response"));
-                        }
-                    })
-                    .onErrorResume(error -> {
-                        logger.error("Error processing prompt: ", error);
-                        return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body(ApiResponse.<String>error("Error processing your request: " + error.getMessage())));
-                    });
+                    .map(this::handleChatGptResponse)
+                    .doOnSuccess(response -> logger.info("Request processed successfully"))
+                    .doOnError(error -> logger.error("Error in reactive stream: ", error))
+                    .onErrorReturn(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(ApiResponse.<String>error("Error processing your request")));
+                            
         } catch (Exception e) {
             logger.error("Unexpected error in processPrompt: ", e);
             return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.<String>error("Unexpected error occurred")));
+        }
+    }
+
+    private ResponseEntity<ApiResponse<String>> handleChatGptResponse(ChatGptResponse response) {
+        try {
+            if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
+                String content = response.getChoices().get(0).getMessage().getContent();
+                logger.info("ChatGPT response received successfully");
+                return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", content));
+            } else {
+                logger.error("Empty or invalid response from ChatGPT");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(ApiResponse.<String>error("No response from AI service"));
+            }
+        } catch (Exception e) {
+            logger.error("Error processing ChatGPT response: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.<String>error("Error processing AI response"));
         }
     }
 
