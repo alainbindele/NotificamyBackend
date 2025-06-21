@@ -16,10 +16,10 @@ public class Keychain {
     @Column(name = "alias", length = 100)
     private String alias;
 
-    @Column(name = "expired", nullable = false, columnDefinition = "TINYINT DEFAULT 0")
+    @Column(name = "expired", nullable = false, columnDefinition = "TINYINT")
     private Boolean expired = false;
 
-    @Column(name = "disabled", columnDefinition = "TINYINT DEFAULT 0")
+    @Column(name = "disabled", columnDefinition = "TINYINT")
     private Boolean disabled = false;
 
     public Keychain() {}

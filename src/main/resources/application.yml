@@ -17,7 +17,7 @@ spring:
   # JPA Configuration
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
@@ -34,7 +34,7 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
-# OpenAI Confid
+# OpenAI Configuration
 openai:
   api:
     key: ${OPENAI_API_KEY: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}
