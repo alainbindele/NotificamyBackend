@@ -27,12 +27,21 @@ spring:
   # Security settings
   security:
     require-ssl: false
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://${auth0.domain}/
   
   # Jackson settings
   jackson:
     default-property-inclusion: non_null
     serialization:
       write-dates-as-timestamps: false
+
+# Auth0 Configuration
+auth0:
+  domain: ${AUTH0_DOMAIN:your-auth0-domain.auth0.com}
+  audience: ${AUTH0_AUDIENCE:your-api-identifier}
 
 # OpenAI Configuration
 openai:

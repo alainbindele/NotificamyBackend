@@ -1,10 +1,10 @@
 # NotifyMe Backend
 
-Spring Boot backend service for the NotifyMe application that processes user prompts and integrates with ChatGPT API.
+Spring Boot backend service for the NotifyMe application that processes user prompts and integrates with ChatGPT API using Auth0 JWT authentication.
 
 ## Features
 
-- **API Key Authentication**: Secure authentication using database-stored API keys
+- **JWT Authentication**: Secure authentication using Auth0 OAuth with JWT tokens
 - **Security First**: Built-in SQL injection protection and input validation
 - **ChatGPT Integration**: Seamless integration with OpenAI's ChatGPT API
 - **RESTful API**: Clean REST endpoints with proper error handling
@@ -15,28 +15,21 @@ Spring Boot backend service for the NotifyMe application that processes user pro
 
 ## Authentication
 
-All API endpoints (except health checks) require authentication via API key. The API key must be provided in the `api-key` header.
+The API uses JWT tokens provided by Auth0 for authentication. All API endpoints (except health checks) require a valid JWT token in the Authorization header.
 
-### API Key Management
+### JWT Token Format
 
-API keys are stored in the `keychain` table with the following structure:
-
-```sql
-CREATE TABLE `keychain` (
-  `id` int UNSIGNED NOT NULL,
-  `apikey` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
-  `alias` varchar(100) DEFAULT NULL,
-  `expired` tinyint NOT NULL DEFAULT '0',
-  `disabled` tinyint DEFAULT '0'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+```
+Authorization: Bearer <your-jwt-token>
 ```
 
-- `apikey`: The actual API key string
-- `alias`: Optional human-readable name for the key
-- `expired`: Set to 1 to mark the key as expired
-- `disabled`: Set to 1 to temporarily disable the key
+### Auth0 Configuration
 
-Only API keys with `expired = 0` and `disabled = 0` are considered valid.
+The application requires the following Auth0 configuration:
+
+- **Domain**: Your Auth0 domain (e.g., `your-domain.auth0.com`)
+- **Audience**: Your API identifier configured in Auth0
+- **JWKS Endpoint**: Automatically configured based on domain
 
 ## API Endpoints
 
@@ -45,7 +38,7 @@ Process a user prompt and get AI-generated response.
 
 **Headers:**
 ```
-api-key: your-api-key-here
+Authorization: Bearer <jwt-token>
 Content-Type: application/json
 ```
 
@@ -66,6 +59,27 @@ Content-Type: application/json
 }
 ```
 
+### GET /api/v1/user-info
+Get authenticated user information.
+
+**Headers:**
+```
+Authorization: Bearer <jwt-token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "User information retrieved",
+  "data": {
+    "id": "auth0|user-id",
+    "email": "user@example.com",
+    "roles": ["ROLE_USER"]
+  }
+}
+```
+
 ### GET /api/v1/health
 Health check endpoint (no authentication required).
 
@@ -82,10 +96,12 @@ Health check endpoint (no authentication required).
 
 ### Environment Variables
 
-- `DATABASE_URL`: MySQL database connection URL (default: jdbc:mysql://localhost:3306/notifyme?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true)
-- `DATABASE_USERNAME`: Database username (default: root)
-- `DATABASE_PASSWORD`: Database password (default: password)
+- `DATABASE_URL`: MySQL database connection URL
+- `MYSQL_USER`: Database username
+- `MYSQL_PASS`: Database password
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
+- `AUTH0_DOMAIN`: Your Auth0 domain (required)
+- `AUTH0_AUDIENCE`: Your Auth0 API identifier (required)
 
 ### Application Properties
 
@@ -95,15 +111,16 @@ The application uses YAML configuration in `application.yml`. Key settings:
 - Database: MySQL with JPA/Hibernate
 - OpenAI API URL: https://api.openai.com/v1/chat/completions
 - CORS: Enabled for all origins
-- Security: API key-based authentication
+- Security: JWT-based authentication with Auth0
+- OAuth2 Resource Server: Configured for JWT validation
 
 ## Security Features
 
-### API Key Authentication
-- Database-backed API key validation
-- Support for key expiration and disabling
-- Secure header-based authentication
-- Automatic rejection of invalid/expired keys
+### JWT Token Validation
+- Auth0 JWT token verification using JWKS
+- Automatic token signature validation
+- Issuer and audience verification
+- Token expiration checking
 
 ### SQL Injection Protection
 - Pattern-based detection of common SQL injection attempts
@@ -120,6 +137,28 @@ The application uses YAML configuration in `application.yml`. Key settings:
 - Supports all common HTTP methods
 - Credential support enabled
 
+## Auth0 Setup
+
+### 1. Create Auth0 Application
+1. Go to [Auth0 Dashboard](https://manage.auth0.com/)
+2. Create a new Single Page Application (SPA) for your frontend
+3. Configure allowed callback URLs, logout URLs, and web origins
+
+### 2. Create Auth0 API
+1. In Auth0 Dashboard, go to APIs
+2. Create a new API with a unique identifier (this becomes your `AUTH0_AUDIENCE`)
+3. Enable RBAC if you need role-based access control
+
+### 3. Configure Environment Variables
+```bash
+export AUTH0_DOMAIN=your-domain.auth0.com
+export AUTH0_AUDIENCE=your-api-identifier
+export OPENAI_API_KEY=your-openai-api-key
+export DATABASE_URL=your-database-url
+export MYSQL_USER=your-db-username
+export MYSQL_PASS=your-db-password
+```
+
 ## Running the Application
 
 ### Prerequisites
@@ -127,24 +166,10 @@ The application uses YAML configuration in `application.yml`. Key settings:
 - Maven 3.6+
 - MySQL 8.0+
 - OpenAI API key
-
-### Database Setup
-1. Create a MySQL database named `notifyme`
-2. Create the `keychain` table using the SQL provided above
-3. Insert at least one valid API key:
-   ```sql
-   INSERT INTO keychain (apikey, alias, expired, disabled) 
-   VALUES ('your-secure-api-key-here', 'development-key', 0, 0);
-   ```
+- Auth0 account and configured application/API
 
 ### Local Development
-1. Set your environment variables:
-   ```bash
-   export DATABASE_URL=jdbc:mysql://localhost:3306/notifyme?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-   export DATABASE_USERNAME=your-db-username
-   export DATABASE_PASSWORD=your-db-password
-   export OPENAI_API_KEY=your-openai-api-key
-   ```
+1. Set your environment variables (see above)
 
 2. Run the application:
    ```bash
@@ -154,11 +179,20 @@ The application uses YAML configuration in `application.yml`. Key settings:
 3. The API will be available at `http://localhost:8080`
 
 ### Testing API with curl
+
+First, obtain a JWT token from your Auth0 application, then:
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/validate-prompt \
-  -H "api-key: your-secure-api-key-here" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Remind me to call mom tomorrow at 3pm", "email": "test@example.com"}'
+```
+
+### Testing User Info Endpoint
+```bash
+curl -X GET http://localhost:8080/api/v1/user-info \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### Testing
@@ -175,8 +209,6 @@ src/
 │   ├── java/com/notifyme/
 │   │   ├── controller/          # REST controllers
 │   │   ├── dto/                 # Data transfer objects
-│   │   ├── entity/              # JPA entities
-│   │   ├── repository/          # Data repositories
 │   │   ├── service/             # Business logic services
 │   │   ├── security/            # Security filters and components
 │   │   ├── config/              # Configuration classes
@@ -189,21 +221,68 @@ src/
 
 ## Integration with Frontend
 
-The backend is designed to work with the NotifyMe React frontend. Make sure to:
+The backend is designed to work with Auth0-enabled frontends. Make sure to:
 
-1. Update the frontend API base URL to point to this backend
-2. Include the `api-key` header in all API requests
-3. Handle the API response format in your frontend code
-4. Implement proper error handling for authentication and validation failures
+1. Configure your frontend to authenticate with Auth0
+2. Include the JWT token in the `Authorization: Bearer <token>` header for all API requests
+3. Handle token expiration and refresh in your frontend
+4. Implement proper error handling for authentication failures
+
+### Frontend Auth0 Integration Example
+
+```javascript
+// Example using Auth0 SPA SDK
+import { createAuth0Client } from '@auth0/auth0-spa-js';
+
+const auth0 = await createAuth0Client({
+  domain: 'your-domain.auth0.com',
+  clientId: 'your-client-id',
+  authorizationParams: {
+    redirect_uri: window.location.origin,
+    audience: 'your-api-identifier'
+  }
+});
+
+// Get token and make API call
+const token = await auth0.getTokenSilently();
+const response = await fetch('/api/v1/validate-prompt', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    prompt: 'Your prompt here',
+    email: 'user@example.com'
+  })
+});
+```
 
 ## Deployment
 
 For production deployment:
 
 1. Set up a production MySQL database
-2. Create and configure API keys in the keychain table
+2. Configure Auth0 for production (update allowed origins, callback URLs)
 3. Set all required environment variables
 4. Configure appropriate logging levels
 5. Consider using HTTPS in production
 6. Set up proper monitoring and health checks
-7. Implement API key rotation strategy
+7. Implement proper error handling and alerting
+
+## Migration from API Key Authentication
+
+This version replaces the previous API key authentication system with JWT tokens. The following changes were made:
+
+- Removed API key-based authentication filter
+- Removed keychain database table and related entities
+- Added JWT authentication filter with Auth0 integration
+- Updated security configuration for OAuth2 resource server
+- Added user information endpoint
+- Updated all API endpoints to work with JWT authentication
+
+If you're migrating from the previous version, you'll need to:
+1. Set up Auth0 account and configure applications/APIs
+2. Update your frontend to use Auth0 authentication
+3. Remove the keychain table from your database (if desired)
+4. Update environment variables to include Auth0 configuration
