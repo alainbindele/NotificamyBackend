@@ -32,8 +32,16 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         
         String requestPath = request.getRequestURI();
         
-        // Skip authentication for health check endpoint
-        if (requestPath.equals("/api/v1/health") || requestPath.equals("/actuator/health")) {
+        // Skip authentication for health check endpoint and error endpoint
+        if (requestPath.equals("/api/v1/health") || 
+            requestPath.equals("/actuator/health") || 
+            requestPath.equals("/error")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Only process API endpoints
+        if (!requestPath.startsWith("/api/v1/")) {
             filterChain.doFilter(request, response);
             return;
         }
