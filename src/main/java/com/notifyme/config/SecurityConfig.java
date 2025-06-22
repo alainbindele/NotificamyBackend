@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -22,6 +23,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Collection;
+import java.util.Collections;
 
 @Configuration
 @EnableWebSecurity
@@ -68,19 +70,23 @@ public class SecurityConfig {
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        authoritiesConverter.setAuthorityPrefix("ROLE_");
-        authoritiesConverter.setAuthoritiesClaimName("permissions");
-
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        
+        // Configura il converter per le authorities
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            // Estrai le authorities dal JWT
-            Collection<SimpleGrantedAuthority> authorities = List.of(
+            // Restituisce una Collection<GrantedAuthority> invece di Collection<SimpleGrantedAuthority>
+            Collection<GrantedAuthority> authorities = Collections.singletonList(
                 new SimpleGrantedAuthority("ROLE_USER")
             );
             
             // Puoi aggiungere logica personalizzata qui per estrarre ruoli dal JWT
-            // ad esempio: jwt.getClaimAsStringList("permissions")
+            // ad esempio: 
+            // List<String> permissions = jwt.getClaimAsStringList("permissions");
+            // if (permissions != null) {
+            //     authorities.addAll(permissions.stream()
+            //         .map(permission -> new SimpleGrantedAuthority("ROLE_" + permission))
+            //         .collect(Collectors.toList()));
+            // }
             
             return authorities;
         });
