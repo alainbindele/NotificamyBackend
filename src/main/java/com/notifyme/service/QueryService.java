@@ -64,6 +64,17 @@ public class QueryService {
         return savedQuery;
     }
     
+    public Query createFallbackQuery(User user, String prompt) {
+        Query query = new Query(user, prompt);
+        query.setIsValid(false);
+        
+        Query savedQuery = queryRepository.save(query);
+        logger.info("Created fallback query with ID: {} for user: {} (invalid due to parsing error)", 
+                   savedQuery.getId(), user.getEmail());
+        
+        return savedQuery;
+    }
+    
     public List<Query> findByUser(User user) {
         return queryRepository.findByUserOrderByCreatedAtDesc(user);
     }

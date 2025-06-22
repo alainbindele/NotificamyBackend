@@ -113,12 +113,10 @@ public class PromptController {
                     
                     // Fallback: save as invalid query with raw response
                     User user = userService.findOrCreateUser(userEmail != null ? userEmail : userId);
-                    Query fallbackQuery = new Query(user, sanitizedPrompt);
-                    fallbackQuery.setIsValid(false);
-                    Query savedQuery = queryService.queryRepository.save(fallbackQuery);
+                    Query fallbackQuery = queryService.createFallbackQuery(user, sanitizedPrompt);
                     
                     Object responseData = new Object() {
-                        public final Long queryId = savedQuery.getId();
+                        public final Long queryId = fallbackQuery.getId();
                         public final Boolean isValid = false;
                         public final String rawResponse = content;
                         public final String error = "Failed to parse validation response";
