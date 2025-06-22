@@ -13,7 +13,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -45,12 +44,19 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authz -> authz
+                // Endpoint pubblici
                 .requestMatchers("/api/v1/health").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/error").permitAll()
+                .requestMatchers("/favicon.ico").permitAll()
+                
+                // Endpoint API protetti
                 .requestMatchers("/api/v1/**").authenticated()
+                
+                // Tutto il resto permesso (per il frontend)
                 .anyRequest().permitAll()
             )
+            // Configurazione JWT Resource Server
             .oauth2ResourceServer(oauth2 -> oauth2
                 .jwt(jwt -> jwt
                     .decoder(jwtDecoder())
@@ -74,19 +80,17 @@ public class SecurityConfig {
         
         // Configura il converter per le authorities
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            // Restituisce una Collection<GrantedAuthority> invece di Collection<SimpleGrantedAuthority>
             Collection<GrantedAuthority> authorities = Collections.singletonList(
                 new SimpleGrantedAuthority("ROLE_USER")
             );
             
-            // Puoi aggiungere logica personalizzata qui per estrarre ruoli dal JWT
-            // ad esempio: 
-            // List<String> permissions = jwt.getClaimAsStringList("permissions");
-            // if (permissions != null) {
-            //     authorities.addAll(permissions.stream()
-            //         .map(permission -> new SimpleGrantedAuthority("ROLE_" + permission))
-            //         .collect(Collectors.toList()));
-            // }
+            // Estrai ruoli/permessi dal JWT se presenti
+            List<String> permissions = jwt.getClaimAsStringList("permissions");
+            if (permissions != null && !permissions.isEmpty()) {
+                permissions.forEach(permission -> 
+                    ((List<GrantedAuthority>) authorities).add(new SimpleGrantedAuthority("SCOPE_" + permission))
+                );
+            }
             
             return authorities;
         });
