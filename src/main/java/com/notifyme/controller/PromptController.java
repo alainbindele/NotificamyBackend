@@ -18,7 +18,8 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin(origins = "*", maxAge = 3600)
+@CrossOrigin(origins = {"https://notificamy.com", "https://www.notificamy.com", "http://localhost:3000", "http://localhost:5173"}, 
+             allowCredentials = "true", maxAge = 3600)
 public class PromptController {
 
     private static final Logger logger = LoggerFactory.getLogger(PromptController.class);
@@ -35,7 +36,7 @@ public class PromptController {
         
         // Get authenticated user information
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication.getName();
+        String userId = authentication != null ? authentication.getName() : "anonymous";
         String userEmail = (String) httpRequest.getAttribute("userEmail");
         
         logger.info("Received prompt request from authenticated user: {} ({})", userEmail, userId);
@@ -76,15 +77,16 @@ public class PromptController {
     @GetMapping("/user-info")
     public ResponseEntity<ApiResponse<Object>> getUserInfo(HttpServletRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication.getName();
+        String userId = authentication != null ? authentication.getName() : "anonymous";
         String userEmail = (String) request.getAttribute("userEmail");
         
         Object userInfo = new Object() {
             public final String id = userId;
-            public final String email = userEmail;
-            public final String[] roles = authentication.getAuthorities().stream()
+            public final String email = userEmail != null ? userEmail : userId;
+            public final String[] roles = authentication != null ? 
+                authentication.getAuthorities().stream()
                     .map(auth -> auth.getAuthority())
-                    .toArray(String[]::new);
+                    .toArray(String[]::new) : new String[]{"ROLE_ANONYMOUS"};
         };
         
         return ResponseEntity.ok(ApiResponse.success("User information retrieved", userInfo));

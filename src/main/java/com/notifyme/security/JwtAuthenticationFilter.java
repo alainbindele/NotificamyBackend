@@ -59,6 +59,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Handle preflight requests
+        if ("OPTIONS".equals(method)) {
+            logger.debug("Handling OPTIONS preflight request for: {}", requestPath);
+            response.setStatus(HttpServletResponse.SC_OK);
+            return;
+        }
+
         // Check if already authenticated
         if (SecurityContextHolder.getContext().getAuthentication() != null && 
             SecurityContextHolder.getContext().getAuthentication().isAuthenticated()) {
@@ -79,6 +86,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String userId = decodedJWT.getSubject();
                     String email = decodedJWT.getClaim("email").asString();
                     
+                    // Fallback per email se non presente nel claim principale
+                    if (email == null || email.isEmpty()) {
+                        email = decodedJWT.getClaim("https://notificamy.com/email").asString();
+                    }
+                    if (email == null || email.isEmpty()) {
+                        email = decodedJWT.getClaim("name").asString();
+                    }
+                    
                     // Create authentication token
                     List<SimpleGrantedAuthority> authorities = Collections.singletonList(
                         new SimpleGrantedAuthority("ROLE_USER")
@@ -90,7 +105,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     
                     // Add user info to request attributes
                     request.setAttribute("userId", userId);
-                    request.setAttribute("userEmail", email);
+                    request.setAttribute("userEmail", email != null ? email : userId);
                     
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                     logger.info("JWT authentication successful for user: {} ({})", email, userId);
@@ -99,15 +114,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (Exception e) {
                 logger.error("JWT authentication failed: {}", e.getMessage());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write("{\"error\":\"Invalid or expired token\",\"success\":false}");
                 response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Invalid or expired token\",\"success\":false}");
                 return;
             }
         } else {
             logger.warn("No valid Authorization header found for request: {}", requestPath);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("{\"error\":\"Authorization token required\",\"success\":false}");
             response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Authorization token required\",\"success\":false}");
             return;
         }
 
