@@ -62,29 +62,44 @@ public class PromptController {
                    emailToSave, userId, request.getChannels());
 
         try {
-            // Save or find user in database with notification channels
-            User user = null;
-            if (emailToSave != null && !emailToSave.isEmpty()) {
-                user = userService.findOrCreateUserWithChannels(
-                    emailToSave, 
-                    request.getChannels(), 
-                    request.getChannelConfigs()
-                );
-                logger.info("User found/created with ID: {} and email: {} with notification channels updated", 
-                           user.getId(), user.getEmail());
-            }
-
-            // Validate prompt for security
+            // SECURITY: Validate prompt for security
             if (!securityService.isValidPrompt(request.getPrompt())) {
                 logger.warn("Invalid or potentially malicious prompt detected from user {}: {}", userId, request.getPrompt());
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("Invalid prompt. Please check your input for security violations."));
             }
 
-            // Sanitize input
+            // SECURITY: Validate channels and channel configurations
+            if (!securityService.areValidChannels(request.getChannels())) {
+                logger.warn("Invalid notification channels detected from user {}: {}", userId, request.getChannels());
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Invalid notification channels specified."));
+            }
+
+            if (!securityService.validateChannelConfigs(request.getChannels(), request.getChannelConfigs())) {
+                logger.warn("Invalid or potentially malicious channel configurations detected from user {}: {}", 
+                           userId, request.getChannels());
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Invalid channel configurations. Please check webhook URLs, phone numbers, and email addresses."));
+            }
+
+            // SECURITY: Sanitize all inputs
             String sanitizedPrompt = securityService.sanitizeInput(request.getPrompt());
+            var sanitizedChannelConfigs = securityService.sanitizeChannelConfigs(request.getChannelConfigs());
             
             logger.info("Processing sanitized prompt for user {}: {}", userId, sanitizedPrompt);
+
+            // Save or find user in database with notification channels
+            User user = null;
+            if (emailToSave != null && !emailToSave.isEmpty()) {
+                user = userService.findOrCreateUserWithChannels(
+                    emailToSave, 
+                    request.getChannels(), 
+                    sanitizedChannelConfigs
+                );
+                logger.info("User found/created with ID: {} and email: {} with notification channels updated", 
+                           user.getId(), user.getEmail());
+            }
 
             // Send to ChatGPT synchronously
             ChatGptResponse chatGptResponse = chatGptService.sendPromptToChatGptSync(sanitizedPrompt);
