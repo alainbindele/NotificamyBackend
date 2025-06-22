@@ -48,7 +48,7 @@ public class PromptController {
     private ObjectMapper objectMapper;
 
     @PostMapping("/validate-prompt")
-    public ResponseEntity<ApiResponse<Object>> processPrompt(@Valid @RequestBody PromptRequest request, 
+    public ResponseEntity<ApiResponse<String>> processPrompt(@Valid @RequestBody PromptRequest request, 
                                                            HttpServletRequest httpRequest) {
         
         // Get authenticated user information
@@ -88,24 +88,23 @@ public class PromptController {
                     // Create and save query with validation results
                     Query savedQuery = queryService.createQuery(user, sanitizedPrompt, validationResponse);
                     
-                    // Prepare response data
-                    Object responseData = new Object() {
-                        public final Long queryId = savedQuery.getId();
-                        public final Boolean isValid = savedQuery.getIsValid();
-                        public final String cronParams = savedQuery.getCronParams();
-                        public final String nextExecution = savedQuery.getNextExecution() != null ? 
-                            savedQuery.getNextExecution().toString() : null;
-                        public final ChatGptValidationResponse validation = validationResponse;
-                    };
-                    
                     if (savedQuery.getIsValid()) {
                         logger.info("Valid prompt processed and saved with ID: {} for user: {}", savedQuery.getId(), userId);
-                        return ResponseEntity.ok(ApiResponse.success("Prompt processed and scheduled successfully", responseData));
+                        
+                        // Costruisci un messaggio user-friendly
+                        String successMessage = buildSuccessMessage(savedQuery, validationResponse);
+                        
+                        return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", successMessage));
                     } else {
                         logger.info("Invalid prompt processed and saved with ID: {} for user: {} - Reason: {}", 
                                    savedQuery.getId(), userId, 
                                    validationResponse.getValidity() != null ? validationResponse.getValidity().getInvalidReason() : "Unknown");
-                        return ResponseEntity.ok(ApiResponse.success("Prompt processed but not valid for scheduling", responseData));
+                        
+                        String invalidReason = validationResponse.getValidity() != null ? 
+                            validationResponse.getValidity().getInvalidReason() : "Prompt validation failed";
+                        
+                        return ResponseEntity.ok(ApiResponse.success("Prompt processed but not valid", 
+                            "Your request was processed but couldn't be scheduled: " + invalidReason));
                     }
                     
                 } catch (Exception parseException) {
@@ -115,27 +114,41 @@ public class PromptController {
                     User user = userService.findOrCreateUser(userEmail != null ? userEmail : userId);
                     Query fallbackQuery = queryService.createFallbackQuery(user, sanitizedPrompt);
                     
-                    Object responseData = new Object() {
-                        public final Long queryId = fallbackQuery.getId();
-                        public final Boolean isValid = false;
-                        public final String rawResponse = content;
-                        public final String error = "Failed to parse validation response";
-                    };
-                    
-                    return ResponseEntity.ok(ApiResponse.success("Prompt processed but validation parsing failed", responseData));
+                    return ResponseEntity.ok(ApiResponse.success("Prompt processed", 
+                        "Your request was processed but there was an issue with validation. Please try again or contact support."));
                 }
                 
             } else {
                 logger.error("Empty or invalid response from ChatGPT for user: {}", userId);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(ApiResponse.<Object>error("No response from AI service"));
+                        .body(ApiResponse.<String>error("No response from AI service"));
             }
                             
         } catch (Exception e) {
             logger.error("Error processing prompt for user {}: ", userId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<Object>error("Error processing your request: " + e.getMessage()));
+                    .body(ApiResponse.<String>error("Error processing your request: " + e.getMessage()));
         }
+    }
+
+    private String buildSuccessMessage(Query savedQuery, ChatGptValidationResponse validationResponse) {
+        StringBuilder message = new StringBuilder();
+        
+        // Aggiungi il summary se disponibile
+        if (validationResponse.getSummary() != null && validationResponse.getSummary().getText() != null) {
+            message.append(validationResponse.getSummary().getText()).append("\n\n");
+        }
+        
+        // Aggiungi informazioni sulla schedulazione
+        if (savedQuery.getCronParams() != null) {
+            message.append("✅ Scheduled as recurring notification with pattern: ").append(savedQuery.getCronParams());
+        } else if (savedQuery.getNextExecution() != null) {
+            message.append("✅ Scheduled for: ").append(savedQuery.getNextExecution().toString());
+        } else {
+            message.append("✅ Your notification has been saved and will be processed.");
+        }
+        
+        return message.toString();
     }
 
     @GetMapping("/user-queries")
