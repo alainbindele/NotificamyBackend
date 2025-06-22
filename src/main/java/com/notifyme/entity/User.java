@@ -18,6 +18,15 @@ public class User {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
+    @Column(name = "discord_webhook", columnDefinition = "TEXT")
+    private String discordWebhook = "";
+    
+    @Column(name = "slack_webhook", columnDefinition = "TEXT")
+    private String slackWebhook = "";
+    
+    @Column(name = "phone", length = 30)
+    private String phone = "";
+    
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Query> queries;
     
@@ -42,6 +51,15 @@ public class User {
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    
+    public String getDiscordWebhook() { return discordWebhook; }
+    public void setDiscordWebhook(String discordWebhook) { this.discordWebhook = discordWebhook != null ? discordWebhook : ""; }
+    
+    public String getSlackWebhook() { return slackWebhook; }
+    public void setSlackWebhook(String slackWebhook) { this.slackWebhook = slackWebhook != null ? slackWebhook : ""; }
+    
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone != null ? phone : ""; }
     
     public List<Query> getQueries() { return queries; }
     public void setQueries(List<Query> queries) { this.queries = queries; }

@@ -58,14 +58,20 @@ public class PromptController {
                             ? request.getEmail().trim() 
                             : userEmail;
         
-        logger.info("Received prompt request from authenticated user: {} ({})", emailToSave, userId);
+        logger.info("Received prompt request from authenticated user: {} ({}) with channels: {}", 
+                   emailToSave, userId, request.getChannels());
 
         try {
-            // Save or find user in database
+            // Save or find user in database with notification channels
             User user = null;
             if (emailToSave != null && !emailToSave.isEmpty()) {
-                user = userService.findOrCreateUser(emailToSave);
-                logger.info("User found/created with ID: {} and email: {}", user.getId(), user.getEmail());
+                user = userService.findOrCreateUserWithChannels(
+                    emailToSave, 
+                    request.getChannels(), 
+                    request.getChannelConfigs()
+                );
+                logger.info("User found/created with ID: {} and email: {} with notification channels updated", 
+                           user.getId(), user.getEmail());
             }
 
             // Validate prompt for security
