@@ -3,8 +3,10 @@ package com.notifyme.controller;
 import com.notifyme.dto.ApiResponse;
 import com.notifyme.dto.ChatGptResponse;
 import com.notifyme.dto.PromptRequest;
+import com.notifyme.entity.User;
 import com.notifyme.service.ChatGptService;
 import com.notifyme.service.SecurityService;
+import com.notifyme.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -30,6 +32,9 @@ public class PromptController {
     @Autowired
     private ChatGptService chatGptService;
 
+    @Autowired
+    private UserService userService;
+
     @PostMapping("/validate-prompt")
     public ResponseEntity<ApiResponse<String>> processPrompt(@Valid @RequestBody PromptRequest request, 
                                                            HttpServletRequest httpRequest) {
@@ -39,9 +44,20 @@ public class PromptController {
         String userId = authentication != null ? authentication.getName() : "anonymous";
         String userEmail = (String) httpRequest.getAttribute("userEmail");
         
-        logger.info("Received prompt request from authenticated user: {} ({})", userEmail, userId);
+        // Use email from request if provided, otherwise use the one from JWT
+        String emailToSave = (request.getEmail() != null && !request.getEmail().trim().isEmpty()) 
+                            ? request.getEmail().trim() 
+                            : userEmail;
+        
+        logger.info("Received prompt request from authenticated user: {} ({})", emailToSave, userId);
 
         try {
+            // Save or find user in database
+            if (emailToSave != null && !emailToSave.isEmpty()) {
+                User user = userService.findOrCreateUser(emailToSave);
+                logger.info("User found/created with ID: {} and email: {}", user.getId(), user.getEmail());
+            }
+
             // Validate prompt for security
             if (!securityService.isValidPrompt(request.getPrompt())) {
                 logger.warn("Invalid or potentially malicious prompt detected from user {}: {}", userId, request.getPrompt());
@@ -60,6 +76,8 @@ public class PromptController {
             if (chatGptResponse != null && chatGptResponse.getChoices() != null && !chatGptResponse.getChoices().isEmpty()) {
                 String content = chatGptResponse.getChoices().get(0).getMessage().getContent();
                 logger.info("ChatGPT response received successfully for user: {}", userId);
+                
+                // Return simple string response like commit 96e0d594
                 return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", content));
             } else {
                 logger.error("Empty or invalid response from ChatGPT for user: {}", userId);
