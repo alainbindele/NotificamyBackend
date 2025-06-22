@@ -68,7 +68,7 @@ public class ChatGptValidationResponse {
         
         // Getters and setters
         public Boolean getOutOfBoundsPromptLength() { return outOfBoundsPromptLength; }
-        public void setOutOfBoundsPromptLength(Boolean outOfBoundsPromptLength) { this.outOfBoundsPromptLength; }
+        public void setOutOfBoundsPromptLength(Boolean outOfBoundsPromptLength) { this.outOfBoundsPromptLength = outOfBoundsPromptLength; }
         
         public Boolean getOffensiveLanguageDetected() { return offensiveLanguageDetected; }
         public void setOffensiveLanguageDetected(Boolean offensiveLanguageDetected) { this.offensiveLanguageDetected = offensiveLanguageDetected; }
