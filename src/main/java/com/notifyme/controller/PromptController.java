@@ -2,11 +2,14 @@ package com.notifyme.controller;
 
 import com.notifyme.dto.ApiResponse;
 import com.notifyme.dto.ChatGptResponse;
+import com.notifyme.dto.ChatGptValidationResponse;
 import com.notifyme.dto.PromptRequest;
 import com.notifyme.entity.User;
 import com.notifyme.service.ChatGptService;
 import com.notifyme.service.SecurityService;
 import com.notifyme.service.UserService;
+import com.notifyme.service.QueryService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -35,6 +38,12 @@ public class PromptController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private QueryService queryService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @PostMapping("/validate-prompt")
     public ResponseEntity<ApiResponse<String>> processPrompt(@Valid @RequestBody PromptRequest request, 
                                                            HttpServletRequest httpRequest) {
@@ -53,8 +62,9 @@ public class PromptController {
 
         try {
             // Save or find user in database
+            User user = null;
             if (emailToSave != null && !emailToSave.isEmpty()) {
-                User user = userService.findOrCreateUser(emailToSave);
+                user = userService.findOrCreateUser(emailToSave);
                 logger.info("User found/created with ID: {} and email: {}", user.getId(), user.getEmail());
             }
 
@@ -76,6 +86,26 @@ public class PromptController {
             if (chatGptResponse != null && chatGptResponse.getChoices() != null && !chatGptResponse.getChoices().isEmpty()) {
                 String content = chatGptResponse.getChoices().get(0).getMessage().getContent();
                 logger.info("ChatGPT response received successfully for user: {}", userId);
+                
+                // Parse ChatGPT response to extract validation data
+                try {
+                    ChatGptValidationResponse validationResponse = objectMapper.readValue(content, ChatGptValidationResponse.class);
+                    
+                    // Save query to database with validation data
+                    if (user != null) {
+                        queryService.createQuery(user, sanitizedPrompt, validationResponse);
+                        logger.info("Query saved successfully for user: {}", userId);
+                    }
+                    
+                } catch (Exception parseException) {
+                    logger.warn("Failed to parse ChatGPT validation response, saving as fallback query: {}", parseException.getMessage());
+                    
+                    // Save query anyway, but mark as invalid due to parsing error
+                    if (user != null) {
+                        queryService.createFallbackQuery(user, sanitizedPrompt);
+                        logger.info("Fallback query saved for user: {}", userId);
+                    }
+                }
                 
                 // Return simple string response like commit 96e0d594
                 return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", content));
