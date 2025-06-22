@@ -22,7 +22,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -48,7 +50,7 @@ public class PromptController {
     private ObjectMapper objectMapper;
 
     @PostMapping("/validate-prompt")
-    public ResponseEntity<ApiResponse<String>> processPrompt(@Valid @RequestBody PromptRequest request, 
+    public ResponseEntity<ApiResponse<Object>> processPrompt(@Valid @RequestBody PromptRequest request, 
                                                            HttpServletRequest httpRequest) {
         
         // Get authenticated user information
@@ -88,23 +90,18 @@ public class PromptController {
                     // Create and save query with validation results
                     Query savedQuery = queryService.createQuery(user, sanitizedPrompt, validationResponse);
                     
+                    // Build response JSON object
+                    Map<String, Object> responseData = buildResponseData(savedQuery, validationResponse);
+                    
                     if (savedQuery.getIsValid()) {
                         logger.info("Valid prompt processed and saved with ID: {} for user: {}", savedQuery.getId(), userId);
-                        
-                        // Costruisci un messaggio user-friendly
-                        String successMessage = buildSuccessMessage(savedQuery, validationResponse);
-                        
-                        return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", successMessage));
+                        return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", responseData));
                     } else {
                         logger.info("Invalid prompt processed and saved with ID: {} for user: {} - Reason: {}", 
                                    savedQuery.getId(), userId, 
                                    validationResponse.getValidity() != null ? validationResponse.getValidity().getInvalidReason() : "Unknown");
                         
-                        String invalidReason = validationResponse.getValidity() != null ? 
-                            validationResponse.getValidity().getInvalidReason() : "Prompt validation failed";
-                        
-                        return ResponseEntity.ok(ApiResponse.success("Prompt processed but not valid", 
-                            "Your request was processed but couldn't be scheduled: " + invalidReason));
+                        return ResponseEntity.ok(ApiResponse.success("Prompt processed but not valid", responseData));
                     }
                     
                 } catch (Exception parseException) {
@@ -114,41 +111,82 @@ public class PromptController {
                     User user = userService.findOrCreateUser(userEmail != null ? userEmail : userId);
                     Query fallbackQuery = queryService.createFallbackQuery(user, sanitizedPrompt);
                     
-                    return ResponseEntity.ok(ApiResponse.success("Prompt processed", 
-                        "Your request was processed but there was an issue with validation. Please try again or contact support."));
+                    Map<String, Object> fallbackData = new HashMap<>();
+                    fallbackData.put("queryId", fallbackQuery.getId());
+                    fallbackData.put("isValid", false);
+                    fallbackData.put("error", "Validation parsing failed");
+                    fallbackData.put("rawResponse", content);
+                    
+                    return ResponseEntity.ok(ApiResponse.success("Prompt processed with parsing issues", fallbackData));
                 }
                 
             } else {
                 logger.error("Empty or invalid response from ChatGPT for user: {}", userId);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(ApiResponse.<String>error("No response from AI service"));
+                        .body(ApiResponse.<Object>error("No response from AI service"));
             }
                             
         } catch (Exception e) {
             logger.error("Error processing prompt for user {}: ", userId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<String>error("Error processing your request: " + e.getMessage()));
+                    .body(ApiResponse.<Object>error("Error processing your request: " + e.getMessage()));
         }
     }
 
-    private String buildSuccessMessage(Query savedQuery, ChatGptValidationResponse validationResponse) {
-        StringBuilder message = new StringBuilder();
+    private Map<String, Object> buildResponseData(Query savedQuery, ChatGptValidationResponse validationResponse) {
+        Map<String, Object> data = new HashMap<>();
         
-        // Aggiungi il summary se disponibile
-        if (validationResponse.getSummary() != null && validationResponse.getSummary().getText() != null) {
-            message.append(validationResponse.getSummary().getText()).append("\n\n");
-        }
+        // Query information
+        data.put("queryId", savedQuery.getId());
+        data.put("isValid", savedQuery.getIsValid());
+        data.put("prompt", savedQuery.getPrompt());
+        data.put("createdAt", savedQuery.getCreatedAt().toString());
         
-        // Aggiungi informazioni sulla schedulazione
+        // Scheduling information
         if (savedQuery.getCronParams() != null) {
-            message.append("✅ Scheduled as recurring notification with pattern: ").append(savedQuery.getCronParams());
-        } else if (savedQuery.getNextExecution() != null) {
-            message.append("✅ Scheduled for: ").append(savedQuery.getNextExecution().toString());
-        } else {
-            message.append("✅ Your notification has been saved and will be processed.");
+            data.put("cronParams", savedQuery.getCronParams());
+            data.put("scheduleType", "recurring");
+        }
+        if (savedQuery.getNextExecution() != null) {
+            data.put("nextExecution", savedQuery.getNextExecution().toString());
+            if (savedQuery.getCronParams() == null) {
+                data.put("scheduleType", "specific");
+            }
         }
         
-        return message.toString();
+        // Validation details from ChatGPT
+        if (validationResponse != null) {
+            Map<String, Object> validation = new HashMap<>();
+            
+            if (validationResponse.getSummary() != null) {
+                validation.put("summary", validationResponse.getSummary().getText());
+                validation.put("language", validationResponse.getSummary().getLanguage());
+            }
+            
+            if (validationResponse.getValidity() != null) {
+                validation.put("validPrompt", validationResponse.getValidity().getValidPrompt());
+                validation.put("invalidReason", validationResponse.getValidity().getInvalidReason());
+            }
+            
+            if (validationResponse.getWhenNotify() != null) {
+                Map<String, Object> whenNotify = new HashMap<>();
+                whenNotify.put("detected", validationResponse.getWhenNotify().getDetected());
+                whenNotify.put("cronExpression", validationResponse.getWhenNotify().getCronExpression());
+                whenNotify.put("dateTime", validationResponse.getWhenNotify().getDateTime());
+                validation.put("whenNotify", whenNotify);
+            }
+            
+            if (validationResponse.getMetadata() != null) {
+                Map<String, Object> metadata = new HashMap<>();
+                metadata.put("confidenceScore", validationResponse.getMetadata().getConfidenceScore());
+                metadata.put("tags", validationResponse.getMetadata().getTags());
+                validation.put("metadata", metadata);
+            }
+            
+            data.put("validation", validation);
+        }
+        
+        return data;
     }
 
     @GetMapping("/user-queries")
