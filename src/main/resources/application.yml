@@ -45,6 +45,14 @@ openai:
     key: ${OPENAI_API_KEY}
     url: https://api.openai.com/v1/chat/completions
 
+# AWS Configuration
+aws:
+  region: ${AWS_REGION:eu-west-1}
+  access-key-id: ${AWS_ACCESS_KEY_ID:}
+  secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+  sqs:
+    queue-url: ${AWS_SQS_QUEUE_URL}
+
 # Logging
 logging:
   level:

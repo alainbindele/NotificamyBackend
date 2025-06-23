@@ -112,7 +112,7 @@ public class PromptController {
                 try {
                     ChatGptValidationResponse validationResponse = objectMapper.readValue(content, ChatGptValidationResponse.class);
                     
-                    // Save query to database with validation data
+                    // Save query to database with validation data and send to SQS if valid
                     if (user != null) {
                         queryService.createQuery(user, sanitizedPrompt, validationResponse);
                         logger.info("Query saved successfully for user: {}", userId);

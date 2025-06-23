@@ -25,6 +25,9 @@ public class QueryService {
     @Autowired
     private QueryRepository queryRepository;
     
+    @Autowired
+    private SqsService sqsService;
+    
     public Query createQuery(User user, String prompt, ChatGptValidationResponse validationResponse) {
         Query query = new Query(user, prompt);
         
@@ -61,6 +64,16 @@ public class QueryService {
         Query savedQuery = queryRepository.save(query);
         logger.info("Created new query with ID: {} for user: {} (valid: {})", 
                    savedQuery.getId(), user.getEmail(), isValid);
+        
+        // Se la query è valida, invia il messaggio a SQS
+        if (isValid) {
+            boolean sqsSuccess = sqsService.sendNotificationMessage(savedQuery, user);
+            if (sqsSuccess) {
+                logger.info("Notification message sent to SQS for query ID: {}", savedQuery.getId());
+            } else {
+                logger.warn("Failed to send notification message to SQS for query ID: {}", savedQuery.getId());
+            }
+        }
         
         return savedQuery;
     }
