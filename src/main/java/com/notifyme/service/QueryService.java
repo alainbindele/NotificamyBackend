@@ -95,10 +95,10 @@ public class QueryService {
         try {
             // Per ora, aggiungiamo semplicemente 1 ora come esempio
             // Dovresti implementare un parser cron completo qui
-            return LocalDateTime.now(ZoneId.of("UTC")).plusHours(1);
+            return LocalDateTime.now(ZoneId.of("UTC"));
         } catch (Exception e) {
             logger.warn("Failed to calculate next cron execution for: {}", cronExpression, e);
-            return LocalDateTime.now().plusDays(1); // Fallback
+            return LocalDateTime.now(ZoneId.of("UTC")); // Fallback
         }
     }
 }
