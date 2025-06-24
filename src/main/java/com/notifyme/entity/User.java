@@ -24,7 +24,7 @@ public class User {
     @Column(name = "slack_webhook", columnDefinition = "TEXT")
     private String slackWebhook = "";
     
-    @Column(name = "phone", length = 30)
+    @Column(name = "whatsapp_phone", length = 30)
     private String phone = "";
     
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
