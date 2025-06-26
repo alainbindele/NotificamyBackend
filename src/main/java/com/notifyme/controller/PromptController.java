@@ -90,15 +90,15 @@ public class PromptController {
             logger.info("Processing sanitized prompt for user {}: {}", userId, sanitizedPrompt);
 
             // Save or find user in database with notification channels
-            TUser TUser = null;
+            TUser user = null;
             if (emailToSave != null && !emailToSave.isEmpty()) {
-                TUser = userService.findOrCreateUserWithChannels(
+                user = userService.findOrCreateUserWithChannels(
                     emailToSave, 
                     request.getChannels(), 
                     sanitizedChannelConfigs
                 );
                 logger.info("User found/created with ID: {} and email: {} with notification channels updated", 
-                           TUser.getId(), TUser.getEmail());
+                           user.getId(), user.getEmail());
             }
 
             // Send to ChatGPT synchronously
@@ -113,8 +113,8 @@ public class PromptController {
                     ChatGptValidationResponse validationResponse = objectMapper.readValue(content, ChatGptValidationResponse.class);
                     
                     // Save query to database with complete validation data
-                    if (TUser != null) {
-                        var savedQuery = queryService.createQuery(TUser, sanitizedPrompt, validationResponse);
+                    if (user != null) {
+                        var savedQuery = queryService.createQuery(user, sanitizedPrompt, validationResponse);
                         
                         // Update query with enabled channels
                         if (request.getChannels() != null && !request.getChannels().isEmpty()) {
@@ -148,8 +148,8 @@ public class PromptController {
                     logger.debug("Raw ChatGPT response that failed to parse: {}", content);
                     
                     // Save query anyway, but mark as invalid due to parsing error
-                    if (TUser != null) {
-                        queryService.createFallbackQuery(TUser, sanitizedPrompt);
+                    if (user != null) {
+                        queryService.createFallbackQuery(user, sanitizedPrompt);
                         logger.info("Fallback query saved for user: {}", userId);
                     }
                 }

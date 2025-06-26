@@ -25,6 +25,7 @@ public class ChatGptValidationResponse {
     
     @Data
     public static class WhenNotify {
+        @JsonProperty("type")
         private TimeType timeType;
         
         @JsonProperty("cron_expression")

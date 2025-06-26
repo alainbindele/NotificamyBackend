@@ -10,7 +10,7 @@ import java.util.List;
 @Repository
 public interface NotificationRepository extends JpaRepository<TNotification, Long> {
     
-    List<TNotification> findByUser(TUser TUser);
+    List<TNotification> findByUser(TUser user);
     
-    List<TNotification> findByUserOrderBySentAtDesc(TUser TUser);
+    List<TNotification> findByUserOrderBySentAtDesc(TUser user);
 }

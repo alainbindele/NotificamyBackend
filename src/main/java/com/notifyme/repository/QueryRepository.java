@@ -13,24 +13,24 @@ import java.util.List;
 @Repository
 public interface QueryRepository extends JpaRepository<TQuery, Long> {
     
-    List<TQuery> findByUser(TUser TUser);
+    List<TQuery> findByUser(TUser user);
     
-    List<TQuery> findByUserAndIsValid(TUser TUser, Boolean isValid);
+    List<TQuery> findByUserAndIsValid(TUser user, Boolean isValid);
     
     List<TQuery> findByIsValidAndNextExecutionBefore(Boolean isValid, LocalDateTime dateTime);
     
-    List<TQuery> findByUserOrderByCreatedAtDesc(TUser TUser);
+    List<TQuery> findByUserOrderByCreatedAtDesc(TUser user);
     
     // Query per trovare query per tipo
-    List<TQuery> findByUserAndCronTrue(TUser TUser);
+    List<TQuery> findByUserAndCronTrue(TUser user);
     
-    List<TQuery> findByUserAndDateSpecificTrue(TUser TUser);
+    List<TQuery> findByUserAndDateSpecificTrue(TUser user);
     
-    List<TQuery> findByUserAndToCheckTrue(TUser TUser);
+    List<TQuery> findByUserAndToCheckTrue(TUser user);
     
     // Query per trovare query attive (non chiuse e valide)
     @Query("SELECT q FROM TQuery q WHERE q.user = :user AND q.isValid = true AND (q.closed = false OR q.closed IS NULL)")
-    List<TQuery> findActiveQueriesByUser(@Param("user") TUser TUser);
+    List<TQuery> findActiveQueriesByUser(@Param("user") TUser user);
     
     // Query per trovare query pronte per l'esecuzione con validità temporale
     @Query("SELECT q FROM TQuery q WHERE q.isValid = true AND q.nextExecution <= :now AND " +
@@ -41,14 +41,14 @@ public interface QueryRepository extends JpaRepository<TQuery, Long> {
     
     // Query per statistiche
     @Query("SELECT COUNT(q) FROM TQuery q WHERE q.user = :user AND q.isValid = true")
-    Long countValidQueriesByUser(@Param("user") TUser TUser);
+    Long countValidQueriesByUser(@Param("user") TUser user);
     
     @Query("SELECT COUNT(q) FROM TQuery q WHERE q.user = :user AND q.cron = true")
-    Long countCronQueriesByUser(@Param("user") TUser TUser);
+    Long countCronQueriesByUser(@Param("user") TUser user);
     
     @Query("SELECT COUNT(q) FROM TQuery q WHERE q.user = :user AND q.dateSpecific = true")
-    Long countSpecificQueriesByUser(@Param("user") TUser TUser);
+    Long countSpecificQueriesByUser(@Param("user") TUser user);
     
     @Query("SELECT COUNT(q) FROM TQuery q WHERE q.user = :user AND q.toCheck = true")
-    Long countCheckQueriesByUser(@Param("user") TUser TUser);
+    Long countCheckQueriesByUser(@Param("user") TUser user);
 }

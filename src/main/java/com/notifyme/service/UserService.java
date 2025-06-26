@@ -28,8 +28,8 @@ public class UserService {
         return userRepository.findByEmail(email)
                 .orElseGet(() -> {
                     logger.info("Creating new user with email: {}", email);
-                    TUser newTUser = new TUser(email);
-                    return userRepository.save(newTUser);
+                    TUser newUser = new TUser(email);
+                    return userRepository.save(newUser);
                 });
     }
     
@@ -38,7 +38,7 @@ public class UserService {
             throw new IllegalArgumentException("Email cannot be null or empty");
         }
         
-        TUser TUser = userRepository.findByEmail(email)
+        TUser user = userRepository.findByEmail(email)
                 .orElseGet(() -> {
                     logger.info("Creating new user with email: {}", email);
                     return new TUser(email);
@@ -46,10 +46,10 @@ public class UserService {
         
         // Aggiorna i canali di notifica se forniti
         if (channels != null && channelConfigs != null) {
-            updateUserChannels(TUser, channels, channelConfigs);
+            updateUserChannels(user, channels, channelConfigs);
         }
         
-        return userRepository.save(TUser);
+        return userRepository.save(user);
     }
     
     private void updateUserChannels(TUser user, List<String> channels, Map<String, String> channelConfigs) {

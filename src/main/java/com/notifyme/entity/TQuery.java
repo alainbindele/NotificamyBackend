@@ -19,7 +19,7 @@ public class TQuery {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private TUser TUser;
+    private TUser user; // Cambiato da TUser a user per Spring Data JPA
     
     @Column(columnDefinition = "TEXT", nullable = false)
     private String prompt;
@@ -111,14 +111,14 @@ public class TQuery {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
-    @OneToMany(mappedBy = "TQuery", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<TExecution> TExecutions;
+    @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TExecution> executions;
     
-    @OneToMany(mappedBy = "TQuery", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<TNotification> TNotifications;
+    @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TNotification> notifications;
     
-    public TQuery(TUser TUser, String prompt) {
-        this.TUser = TUser;
+    public TQuery(TUser user, String prompt) {
+        this.user = user;
         this.prompt = prompt;
         this.createdAt = LocalDateTime.now();
     }

@@ -10,7 +10,7 @@ import java.util.List;
 @Repository
 public interface ExecutionRepository extends JpaRepository<TExecution, Long> {
     
-    List<TExecution> findByQuery(TQuery TQuery);
+    List<TExecution> findByQuery(TQuery query);
     
-    List<TExecution> findByQueryOrderByExecutedAtDesc(TQuery TQuery);
+    List<TExecution> findByQueryOrderByExecutedAtDesc(TQuery query);
 }

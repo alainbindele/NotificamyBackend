@@ -32,11 +32,11 @@ public class TUser {
     @Column(name = "whatsapp_phone", length = 30)
     private String phone = "";
     
-    @OneToMany(mappedBy = "TUser", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<TQuery> queries;
     
-    @OneToMany(mappedBy = "TUser", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<TNotification> TNotifications;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TNotification> notifications;
     
     public TUser(String email) {
         this.email = email;

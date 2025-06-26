@@ -18,11 +18,11 @@ public class TNotification {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private TUser TUser;
+    private TUser user; // Cambiato da TUser a user per Spring Data JPA
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "query_id")
-    private TQuery TQuery;
+    private TQuery query; // Cambiato da TQuery a query per Spring Data JPA
     
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
@@ -32,9 +32,9 @@ public class TNotification {
     @Column(columnDefinition = "TEXT")
     private String content;
     
-    public TNotification(TUser TUser, TQuery TQuery, String subject, String content) {
-        this.TUser = TUser;
-        this.TQuery = TQuery;
+    public TNotification(TUser user, TQuery query, String subject, String content) {
+        this.user = user;
+        this.query = query;
         this.subject = subject;
         this.content = content;
         this.sentAt = LocalDateTime.now();
