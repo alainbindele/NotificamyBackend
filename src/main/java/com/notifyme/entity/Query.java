@@ -24,12 +24,14 @@ public class Query {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String prompt;
 
+    // Status fields
     @Column(name = "closed")
     private Boolean closed = false;
 
     @Column(name = "is_valid")
     private Boolean isValid = false;
 
+    // Type flags from ChatGPT response
     @Column(name = "cron")
     private Boolean cron = false;
 
@@ -39,33 +41,81 @@ public class Query {
     @Column(name = "to_check")
     private Boolean toCheck = false;
     
-    @Column(name = "cron_params", length = 30)
+    // Scheduling fields
+    @Column(name = "cron_params", length = 100)
     private String cronParams;
     
     @Column(name = "next_execution")
     private LocalDateTime nextExecution;
     
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    @Column(name = "specific_datetime")
+    private LocalDateTime specificDatetime;
     
+    // Validity period
     @Column(name = "valid_from")
     private LocalDateTime validFrom;
     
     @Column(name = "valid_to")
     private LocalDateTime validTo;
 
-    @Column(name = "enabled_channels")
+    // Notification channels
+    @Column(name = "enabled_channels", columnDefinition = "TEXT")
     private String enabledChannels;
 
+    // ChatGPT validation fields
+    @Column(name = "out_of_bounds_prompt_length")
+    private Boolean outOfBoundsPromptLength;
+    
+    @Column(name = "offensive_language_detected")
+    private Boolean offensiveLanguageDetected;
+    
+    @Column(name = "nasty_instruction_detected")
+    private Boolean nastyInstructionDetected;
+    
+    @Column(name = "purpose_valid")
+    private Boolean purposeValid;
+    
+    @Column(name = "reasonable_usage")
+    private Boolean reasonableUsage;
+    
+    @Column(name = "self_enforcing")
+    private Boolean selfEnforcing;
+    
+    @Column(name = "invalid_reason", columnDefinition = "TEXT")
+    private String invalidReason;
 
+    // Summary fields
+    @Column(name = "summary_text", columnDefinition = "TEXT")
+    private String summaryText;
+    
+    @Column(name = "language", length = 10)
+    private String language;
+    
+    @Column(name = "category", length = 50)
+    private String category;
+
+    // Metadata fields
+    @Column(name = "model_version", length = 50)
+    private String modelVersion;
+    
+    @Column(name = "confidence_score")
+    private Double confidenceScore;
+    
+    @Column(name = "policy_enforced")
+    private Boolean policyEnforced;
+    
+    @Column(name = "tags", columnDefinition = "TEXT")
+    private String tags; // JSON array as string
+    
+    // Timestamps
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
     
     @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Execution> executions;
     
     @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Notification> notifications;
-
-
     
     public Query(User user, String prompt) {
         this.user = user;

@@ -112,14 +112,40 @@ public class PromptController {
                 try {
                     ChatGptValidationResponse validationResponse = objectMapper.readValue(content, ChatGptValidationResponse.class);
                     
-                    // Save query to database with validation data
+                    // Save query to database with complete validation data
                     if (user != null) {
-                        queryService.createQuery(user, sanitizedPrompt, validationResponse);
-                        logger.info("Query saved successfully for user: {}", userId);
+                        var savedQuery = queryService.createQuery(user, sanitizedPrompt, validationResponse);
+                        
+                        // Update query with enabled channels
+                        if (request.getChannels() != null && !request.getChannels().isEmpty()) {
+                            try {
+                                savedQuery.setEnabledChannels(objectMapper.writeValueAsString(request.getChannels()));
+                                logger.info("Updated query {} with enabled channels: {}", savedQuery.getId(), request.getChannels());
+                            } catch (Exception e) {
+                                logger.warn("Failed to serialize enabled channels: {}", e.getMessage());
+                            }
+                        }
+                        
+                        logger.info("Query saved successfully for user: {} with full ChatGPT validation data", userId);
+                    }
+                    
+                    // Log validation results for monitoring
+                    if (validationResponse.getValidity() != null) {
+                        logger.info("Validation results for user {}: valid={}, cron={}, specific={}, check={}, reason={}", 
+                                   userId, 
+                                   validationResponse.getValidity().getValidPrompt(),
+                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getType() != null ? 
+                                       validationResponse.getWhenNotify().getType().getCron() : false,
+                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getType() != null ? 
+                                       validationResponse.getWhenNotify().getType().getSpecific() : false,
+                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getType() != null ? 
+                                       validationResponse.getWhenNotify().getType().getCheck() : false,
+                                   validationResponse.getValidity().getInvalidReason());
                     }
                     
                 } catch (Exception parseException) {
                     logger.warn("Failed to parse ChatGPT validation response, saving as fallback query: {}", parseException.getMessage());
+                    logger.debug("Raw ChatGPT response that failed to parse: {}", content);
                     
                     // Save query anyway, but mark as invalid due to parsing error
                     if (user != null) {
