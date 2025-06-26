@@ -1,10 +1,15 @@
 package com.notifyme.entity;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "notifications")
+@Data
+@NoArgsConstructor
 public class Notification {
     
     @Id
@@ -27,34 +32,18 @@ public class Notification {
     @Column(columnDefinition = "TEXT")
     private String content;
     
-    public Notification() {
-        this.sentAt = LocalDateTime.now();
-    }
-    
     public Notification(User user, Query query, String subject, String content) {
-        this();
         this.user = user;
         this.query = query;
         this.subject = subject;
         this.content = content;
+        this.sentAt = LocalDateTime.now();
     }
     
-    // Getters and setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-    
-    public Query getQuery() { return query; }
-    public void setQuery(Query query) { this.query = query; }
-    
-    public LocalDateTime getSentAt() { return sentAt; }
-    public void setSentAt(LocalDateTime sentAt) { this.sentAt = sentAt; }
-    
-    public String getSubject() { return subject; }
-    public void setSubject(String subject) { this.subject = subject; }
-    
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
+    @PrePersist
+    protected void onCreate() {
+        if (sentAt == null) {
+            sentAt = LocalDateTime.now();
+        }
+    }
 }

@@ -4,9 +4,16 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.Valid;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 import java.util.Map;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class PromptRequest {
     
     @NotBlank(message = "Prompt cannot be empty")
@@ -24,42 +31,8 @@ public class PromptRequest {
     private Map<@Size(max = 20, message = "Channel key too long") String, 
                @Size(max = 500, message = "Channel configuration too long") String> channelConfigs;
 
-    public PromptRequest() {}
-
     public PromptRequest(String prompt, String email) {
         this.prompt = prompt;
         this.email = email;
-    }
-
-    public String getPrompt() {
-        return prompt;
-    }
-
-    public void setPrompt(String prompt) {
-        this.prompt = prompt;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public List<String> getChannels() {
-        return channels;
-    }
-
-    public void setChannels(List<String> channels) {
-        this.channels = channels;
-    }
-
-    public Map<String, String> getChannelConfigs() {
-        return channelConfigs;
-    }
-
-    public void setChannelConfigs(Map<String, String> channelConfigs) {
-        this.channelConfigs = channelConfigs;
     }
 }

@@ -1,11 +1,16 @@
 package com.notifyme.entity;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
 @Table(name = "users")
+@Data
+@NoArgsConstructor
 public class User {
     
     @Id
@@ -33,37 +38,28 @@ public class User {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Notification> notifications;
     
-    public User() {
+    public User(String email) {
+        this.email = email;
         this.createdAt = LocalDateTime.now();
     }
     
-    public User(String email) {
-        this();
-        this.email = email;
+    // Custom setters to handle null values
+    public void setDiscordWebhook(String discordWebhook) {
+        this.discordWebhook = discordWebhook != null ? discordWebhook : "";
     }
     
-    // Getters and setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public void setSlackWebhook(String slackWebhook) {
+        this.slackWebhook = slackWebhook != null ? slackWebhook : "";
+    }
     
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public void setPhone(String phone) {
+        this.phone = phone != null ? phone : "";
+    }
     
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    
-    public String getDiscordWebhook() { return discordWebhook; }
-    public void setDiscordWebhook(String discordWebhook) { this.discordWebhook = discordWebhook != null ? discordWebhook : ""; }
-    
-    public String getSlackWebhook() { return slackWebhook; }
-    public void setSlackWebhook(String slackWebhook) { this.slackWebhook = slackWebhook != null ? slackWebhook : ""; }
-    
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone != null ? phone : ""; }
-    
-    public List<Query> getQueries() { return queries; }
-    public void setQueries(List<Query> queries) { this.queries = queries; }
-    
-    public List<Notification> getNotifications() { return notifications; }
-    public void setNotifications(List<Notification> notifications) { this.notifications = notifications; }
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
 }

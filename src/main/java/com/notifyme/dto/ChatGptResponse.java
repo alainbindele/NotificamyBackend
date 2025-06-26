@@ -1,8 +1,10 @@
 package com.notifyme.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
 import java.util.List;
 
+@Data
 public class ChatGptResponse {
     
     private String id;
@@ -12,36 +14,22 @@ public class ChatGptResponse {
     private List<Choice> choices;
     private Usage usage;
 
+    @Data
     public static class Choice {
         private int index;
         private Message message;
         
         @JsonProperty("finish_reason")
         private String finishReason;
-
-        // Getters and setters
-        public int getIndex() { return index; }
-        public void setIndex(int index) { this.index = index; }
-        
-        public Message getMessage() { return message; }
-        public void setMessage(Message message) { this.message = message; }
-        
-        public String getFinishReason() { return finishReason; }
-        public void setFinishReason(String finishReason) { this.finishReason = finishReason; }
     }
 
+    @Data
     public static class Message {
         private String role;
         private String content;
-
-        // Getters and setters
-        public String getRole() { return role; }
-        public void setRole(String role) { this.role = role; }
-        
-        public String getContent() { return content; }
-        public void setContent(String content) { this.content = content; }
     }
 
+    @Data
     public static class Usage {
         @JsonProperty("prompt_tokens")
         private int promptTokens;
@@ -51,34 +39,5 @@ public class ChatGptResponse {
         
         @JsonProperty("total_tokens")
         private int totalTokens;
-
-        // Getters and setters
-        public int getPromptTokens() { return promptTokens; }
-        public void setPromptTokens(int promptTokens) { this.promptTokens = promptTokens; }
-        
-        public int getCompletionTokens() { return completionTokens; }
-        public void setCompletionTokens(int completionTokens) { this.completionTokens = completionTokens; }
-        
-        public int getTotalTokens() { return totalTokens; }
-        public void setTotalTokens(int totalTokens) { this.totalTokens = totalTokens; }
     }
-
-    // Main class getters and setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    
-    public String getObject() { return object; }
-    public void setObject(String object) { this.object = object; }
-    
-    public long getCreated() { return created; }
-    public void setCreated(long created) { this.created = created; }
-    
-    public String getModel() { return model; }
-    public void setModel(String model) { this.model = model; }
-    
-    public List<Choice> getChoices() { return choices; }
-    public void setChoices(List<Choice> choices) { this.choices = choices; }
-    
-    public Usage getUsage() { return usage; }
-    public void setUsage(Usage usage) { this.usage = usage; }
 }

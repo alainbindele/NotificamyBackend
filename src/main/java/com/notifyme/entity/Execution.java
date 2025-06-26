@@ -1,10 +1,15 @@
 package com.notifyme.entity;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "executions")
+@Data
+@NoArgsConstructor
 public class Execution {
     
     @Id
@@ -28,30 +33,17 @@ public class Execution {
         SUCCESS, FAILED
     }
     
-    public Execution() {
-        this.executedAt = LocalDateTime.now();
-    }
-    
     public Execution(Query query, ExecutionStatus status, String response) {
-        this();
         this.query = query;
         this.status = status;
         this.response = response;
+        this.executedAt = LocalDateTime.now();
     }
     
-    // Getters and setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public Query getQuery() { return query; }
-    public void setQuery(Query query) { this.query = query; }
-    
-    public LocalDateTime getExecutedAt() { return executedAt; }
-    public void setExecutedAt(LocalDateTime executedAt) { this.executedAt = executedAt; }
-    
-    public ExecutionStatus getStatus() { return status; }
-    public void setStatus(ExecutionStatus status) { this.status = status; }
-    
-    public String getResponse() { return response; }
-    public void setResponse(String response) { this.response = response; }
+    @PrePersist
+    protected void onCreate() {
+        if (executedAt == null) {
+            executedAt = LocalDateTime.now();
+        }
+    }
 }

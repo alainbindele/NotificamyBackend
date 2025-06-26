@@ -1,11 +1,16 @@
 package com.notifyme.entity;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
 @Table(name = "queries")
+@Data
+@NoArgsConstructor
 public class Query {
     
     @Id
@@ -37,41 +42,16 @@ public class Query {
     @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Notification> notifications;
     
-    public Query() {
+    public Query(User user, String prompt) {
+        this.user = user;
+        this.prompt = prompt;
         this.createdAt = LocalDateTime.now();
     }
     
-    public Query(User user, String prompt) {
-        this();
-        this.user = user;
-        this.prompt = prompt;
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
-    
-    // Getters and setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-    
-    public String getPrompt() { return prompt; }
-    public void setPrompt(String prompt) { this.prompt = prompt; }
-    
-    public Boolean getIsValid() { return isValid; }
-    public void setIsValid(Boolean isValid) { this.isValid = isValid; }
-    
-    public String getCronParams() { return cronParams; }
-    public void setCronParams(String cronParams) { this.cronParams = cronParams; }
-    
-    public LocalDateTime getNextExecution() { return nextExecution; }
-    public void setNextExecution(LocalDateTime nextExecution) { this.nextExecution = nextExecution; }
-    
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    
-    public List<Execution> getExecutions() { return executions; }
-    public void setExecutions(List<Execution> executions) { this.executions = executions; }
-    
-    public List<Notification> getNotifications() { return notifications; }
-    public void setNotifications(List<Notification> notifications) { this.notifications = notifications; }
 }
