@@ -2,6 +2,7 @@ package com.notifyme.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+
 public class ChatGptValidationResponse {
     
     @JsonProperty("response_type")

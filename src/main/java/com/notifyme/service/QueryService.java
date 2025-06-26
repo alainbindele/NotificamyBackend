@@ -3,6 +3,7 @@ package com.notifyme.service;
 import com.notifyme.dto.ChatGptValidationResponse;
 import com.notifyme.entity.Query;
 import com.notifyme.entity.User;
+import com.notifyme.enums.NotificationTypes;
 import com.notifyme.repository.QueryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,14 +39,14 @@ public class QueryService {
             ChatGptValidationResponse.WhenNotify whenNotify = validationResponse.getWhenNotify();
             
             // Imposta i parametri cron se è di tipo CRON
-            if ("CRON".equals(whenNotify.getDetected()) && whenNotify.getCronExpression() != null) {
+            if (NotificationTypes.CRON.toString().equals(whenNotify.getDetected()) && whenNotify.getCronExpression() != null) {
                 query.setCronParams(whenNotify.getCronExpression());
                 // Per i cron job, calcola la prossima esecuzione (implementazione semplificata)
                 query.setNextExecution(calculateNextCronExecution(whenNotify.getCronExpression()));
             }
             
             // Imposta la data/ora specifica se è di tipo SPECIFIC
-            if ("SPECIFIC".equals(whenNotify.getDetected()) && whenNotify.getDateTime() != null) {
+            if (NotificationTypes.SPECIFIC.toString().equals(whenNotify.getDetected()) && whenNotify.getDateTime() != null) {
                 try {
                     LocalDateTime specificDateTime = LocalDateTime.parse(
                         whenNotify.getDateTime(), 

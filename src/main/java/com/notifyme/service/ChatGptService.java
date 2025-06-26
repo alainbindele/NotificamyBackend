@@ -70,7 +70,9 @@ public class ChatGptService {
                     oppure ad una data/tempo in cui essere notificato 
                     (se non viene specificata l'ora e/o giorno manda la notifica a mezzanotte, 
                     se invece viene specificato qualcosa come "mattina, pomeriggio o sera" considera un orario mediano es: mattina= 10AM etc) 
-                3) non deve contenere riferimenti a notifiche che richiedano il controllo periodico e condizionale di un certo evento (es. "cambio di prezzo di un prodotto", "cambio di prezzo di un prodotto in un certo periodo di tempo")
+                3) se contiene riferimenti a notifiche che richiedano il controllo periodico 
+                    e condizionale di un certo evento (es. "cambio di prezzo di un prodotto", "cambio di prezzo di un prodotto in un certo periodo di tempo")
+                    
                 2) Divieto assoluto di linguaggio offensivo, discriminatorio, volgare o anche solo potenzialmente inappropriato.
                 
                 3) Nessuna istruzione dannosa o "nasty instruction", incluse ma non limitate a:
@@ -96,9 +98,15 @@ public class ChatGptService {
                    "timestamp": "2025-06-19T10:45:01Z",
                    "generated_by": "system",
                    "when_notify":{
-                        "detected":"{CRON|SPECIFIC}"
+                        "type":{
+                            "CRON":true|false,
+                            "SPECIFIC":true|false,
+                            "CHECK":true|false
+                        },
                         "cron_expression":"{CRON_ESPRESSION}",
-                        "date_time":"{YYYY-MM-DD HH24:MI:SS}"
+                        "date_time":"{YYYY-MM-DD HH24:MI:SS}"|null,
+                        "start_date":"{YYYY-MM-DD HH24:MI:SS}"|null,
+                        "end_date":"{YYYY-MM-DD HH24:MI:SS}"|null
                    },
                    "validity": {
                      "out_of_bounds_prompt_length": true|false,
@@ -130,10 +138,26 @@ public class ChatGptService {
                  SOSTITUISCI {CHATGPT_MODEL_VERSION} con la versione del modello di ChatGPT utilizzato per generare il prompt (es. "gpt-3.5-turbo").
                  SOSTITUISCI {CONFIDENCE_SCORE} con un valore numerico tra 0 e 1 che rappresenta la fiducia del modello nella validità del prompt generato (es. 0.95).
                  SOSTITUISCI {LANGUAGE} con la lingua in cui è stato generato il prompt (es. "it" per italiano, "en" per inglese), se il prompt è in una certa lingua anche reason e summary devono essere nella stessa lingua.
-                 SOSTITUISCI {CRON|SPECIFIC} con l'espressione "CRON" oppure "SPECIFIC" in base alla rilevazione della temporalità della richiesta (es. se il prompt richiede "ogni giorno alle 18" imposta con "CRON" mentre se richiede "il giorno 15 AGOSTO alle 20" imposta con "SPECIFIC")
-                 SOSTITUISCI {CRON_ESPRESSION} con l'espressione CRONTAB standard di linux che rappresenta il cron che potrebbe essere impostato per quella specifica richiesta (ovviamente se è rilevato CRON in "detected") altrimenti null
-                 SOSTITUISCI {YYYY-MM-DD HH24:MI:SS} con il datetime in questo formato se rilevi specific altrimenti null
-                 
+                 SOSTITUISCI true|false nei campi CRON, SPECIFIC,CHECK in base alla rilevazione della temporalità della richiesta 
+                             (es. - se il prompt richiede "ogni giorno alle 18" imposta con "CRON" con true altrimenti false
+                                  - se richiede "il giorno 15 AGOSTO alle 20" imposta con "SPECIFIC" con true altrimenti false 
+                                  - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$" imposta come "CHECK" con "true" altrimenti false 
+                              )       
+                 SOSTITUISCI {CRON_ESPRESSION} con l'espressione CRONTAB standard di linux che rappresenta il cron che potrebbe essere impostato per quella specifica richiesta (ovviamente se è rilevato CRON come true in "when_notify->type") altrimenti null
+                 SOSTITUISCI {YYYY-MM-DD HH24:MI:SS} con il datetime in questo formato se rilevi SPECIFIC come true altrimenti null
+                 SOSTITUISCI {YYYY-MM-DD HH24:MI:SS}" oppure null in start_time e/o end_time se richiesto che le notifiche abbiano un intervallo di validità specifico
+                 TIENI A MENTE QUESTE POSSIBILI CONFIGURAZIONI PER QUANTO RIGUARDA I FLAG TYPE:
+                 cron            date_specific         to_check        Description
+                  0                    	0                   0           NOT_VALID
+                  1 					0					0			Simply recurrent
+                  1 					1					0			NOT_VALID
+                  0 					1 					0			Simply in a certain date/datetime
+                  0                    	0                   1           Check if a condition is met (default:daily i.e SET CRON ONCE A DAY AT 8AM )
+                  1 					0					1			Check if a condition is met with a specified frequency
+                  1 					1					1			NOT_VALID
+                  0 					1 					1			Check if a condition is met in a certain date/datetime
+                I messaggi contrassegnati come "NOT_VALID" saranno invalidi per il fatto che non possono essere specifici e ricorrenti allo stesso tempo 
+                e non possono essere lasciati NON specificati tutti e 3 i campi type
                 """;
     }
 
