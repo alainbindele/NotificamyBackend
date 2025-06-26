@@ -66,11 +66,25 @@ public class ChatGptService {
                 oppure notifiche programmate per un momento preciso nel futuro (es. "ricordamelo domani alle 8", "tra 10 minuti", "il 3 luglio alle 14")
                 
                 Il prompt deve rispettare rigorosamente i seguenti vincoli:
-                1) Deve indicare esplicitamente un riferimento all'intervallo temporale in cui essere eseguito oppure ad una data/tempo in cui essere notificato (se non viene specificata l'ora manda la notifica a mezzanotte, se invece viene specificato qualcosa come "mattina, pomeriggio o sera" considera un orario mediano es: mattina= 10AM etc) 
+                1) Deve indicare esplicitamente un riferimento all'intervallo temporale in cui essere eseguito 
+                    oppure ad una data/tempo in cui essere notificato 
+                    (se non viene specificata l'ora e/o giorno manda la notifica a mezzanotte, 
+                    se invece viene specificato qualcosa come "mattina, pomeriggio o sera" considera un orario mediano es: mattina= 10AM etc) 
+                3) non deve contenere riferimenti a notifiche che richiedano il controllo periodico e condizionale di un certo evento (es. "cambio di prezzo di un prodotto", "cambio di prezzo di un prodotto in un certo periodo di tempo")
                 2) Divieto assoluto di linguaggio offensivo, discriminatorio, volgare o anche solo potenzialmente inappropriato.
                 
-                3) Nessuna istruzione dannosa o "nasty instruction", incluse ma non limitate a: SQL injection, comandi per ottenere accesso non autorizzato, exploit di sistema, manipolazione di dati, bypass di restrizioni, automazioni illecite, o manipolazioni esterne all'applicazione.
-                4) Lunghezza del prompt: il prompt generato non deve superare i 50 caratteri.
+                3) Nessuna istruzione dannosa o "nasty instruction", incluse ma non limitate a:
+                    SQL injection,
+                    comandi per ottenere accesso non autorizzato, 
+                    codice sorgente malintenzionato,
+                    codice sorgente di qualsiasi tipo e linguaggio di programmazione o markup, 
+                    exploit di sistema, 
+                    manipolazione di dati, 
+                    bypass di restrizioni, 
+                    automazioni illecite, 
+                    manipolazioni esterne all'applicazione
+                    crawling di altri siti.
+                4) Lunghezza del prompt: il prompt generato non deve superare i 100 caratteri.
                 5) Il contenuto deve restare vincolato allo scopo specifico dell'app: notificare l'utente. È vietato includere richieste che esulano da questa funzione.
                 6) Ogni richiesta deve riflettere il buon senso e un utilizzo ragionevole: ad esempio, niente notifiche ogni millisecondo, o richieste assurde come "notificami ogni volta che respiri", o "ricordamelo per 300 anni".
                 7) Il prompt non può generare o ispirare un prompt che violerebbe questa stessa policy.
