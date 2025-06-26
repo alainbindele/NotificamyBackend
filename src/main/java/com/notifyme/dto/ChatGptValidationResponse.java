@@ -25,7 +25,7 @@ public class ChatGptValidationResponse {
     
     @Data
     public static class WhenNotify {
-        private Type type;
+        private TimeType timeType;
         
         @JsonProperty("cron_expression")
         private String cronExpression;
@@ -40,7 +40,7 @@ public class ChatGptValidationResponse {
         private String endDate;
         
         @Data
-        public static class Type {
+        public static class TimeType {
             @JsonProperty("CRON")
             private Boolean cron;
             

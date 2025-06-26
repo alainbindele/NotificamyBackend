@@ -1,8 +1,8 @@
 package com.notifyme.service;
 
 import com.notifyme.dto.ChatGptValidationResponse;
-import com.notifyme.entity.Query;
-import com.notifyme.entity.User;
+import com.notifyme.entity.TQuery;
+import com.notifyme.entity.TUser;
 import com.notifyme.repository.QueryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -28,22 +28,22 @@ public class QueryService {
     @Autowired
     private ObjectMapper objectMapper;
     
-    public Query createQuery(User user, String prompt, ChatGptValidationResponse validationResponse) {
-        Query query = new Query(user, prompt);
+    public TQuery createQuery(TUser TUser, String prompt, ChatGptValidationResponse validationResponse) {
+        TQuery TQuery = new TQuery(TUser, prompt);
         
         // Map validation response to query entity
-        mapValidationResponseToQuery(query, validationResponse);
+        mapValidationResponseToQuery(TQuery, validationResponse);
         
-        Query savedQuery = queryRepository.save(query);
+        TQuery savedTQuery = queryRepository.save(TQuery);
         logger.info("Created new query with ID: {} for user: {} (valid: {})", 
-                   savedQuery.getId(), user.getEmail(), savedQuery.getIsValid());
+                   savedTQuery.getId(), TUser.getEmail(), savedTQuery.getIsValid());
         
-        return savedQuery;
+        return savedTQuery;
     }
     
-    private void mapValidationResponseToQuery(Query query, ChatGptValidationResponse response) {
+    private void mapValidationResponseToQuery(TQuery TQuery, ChatGptValidationResponse response) {
         if (response == null) {
-            query.setIsValid(false);
+            TQuery.setIsValid(false);
             return;
         }
         
@@ -51,14 +51,14 @@ public class QueryService {
         if (response.getValidity() != null) {
             ChatGptValidationResponse.Validity validity = response.getValidity();
             
-            query.setIsValid(Boolean.TRUE.equals(validity.getValidPrompt()));
-            query.setOutOfBoundsPromptLength(validity.getOutOfBoundsPromptLength());
-            query.setOffensiveLanguageDetected(validity.getOffensiveLanguageDetected());
-            query.setNastyInstructionDetected(validity.getNastyInstructionDetected());
-            query.setPurposeValid(validity.getPurposeValid());
-            query.setReasonableUsage(validity.getReasonableUsage());
-            query.setSelfEnforcing(validity.getSelfEnforcing());
-            query.setInvalidReason(validity.getInvalidReason());
+            TQuery.setIsValid(Boolean.TRUE.equals(validity.getValidPrompt()));
+            TQuery.setOutOfBoundsPromptLength(validity.getOutOfBoundsPromptLength());
+            TQuery.setOffensiveLanguageDetected(validity.getOffensiveLanguageDetected());
+            TQuery.setNastyInstructionDetected(validity.getNastyInstructionDetected());
+            TQuery.setPurposeValid(validity.getPurposeValid());
+            TQuery.setReasonableUsage(validity.getReasonableUsage());
+            TQuery.setSelfEnforcing(validity.getSelfEnforcing());
+            TQuery.setInvalidReason(validity.getInvalidReason());
         }
         
         // Map when_notify fields
@@ -66,16 +66,16 @@ public class QueryService {
             ChatGptValidationResponse.WhenNotify whenNotify = response.getWhenNotify();
             
             // Map type flags
-            if (whenNotify.getType() != null) {
-                query.setCron(Boolean.TRUE.equals(whenNotify.getType().getCron()));
-                query.setDateSpecific(Boolean.TRUE.equals(whenNotify.getType().getSpecific()));
-                query.setToCheck(Boolean.TRUE.equals(whenNotify.getType().getCheck()));
+            if (whenNotify.getTimeType() != null) {
+                TQuery.setCron(Boolean.TRUE.equals(whenNotify.getTimeType().getCron()));
+                TQuery.setDateSpecific(Boolean.TRUE.equals(whenNotify.getTimeType().getSpecific()));
+                TQuery.setToCheck(Boolean.TRUE.equals(whenNotify.getTimeType().getCheck()));
             }
             
             // Map cron expression
             if (whenNotify.getCronExpression() != null && !whenNotify.getCronExpression().trim().isEmpty()) {
-                query.setCronParams(whenNotify.getCronExpression().trim());
-                query.setNextExecution(calculateNextCronExecution(whenNotify.getCronExpression()));
+                TQuery.setCronParams(whenNotify.getCronExpression().trim());
+                TQuery.setNextExecution(calculateNextCronExecution(whenNotify.getCronExpression()));
             }
             
             // Map specific datetime
@@ -85,8 +85,8 @@ public class QueryService {
                         whenNotify.getDateTime().trim(), 
                         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                     );
-                    query.setSpecificDatetime(specificDateTime);
-                    query.setNextExecution(specificDateTime);
+                    TQuery.setSpecificDatetime(specificDateTime);
+                    TQuery.setNextExecution(specificDateTime);
                 } catch (DateTimeParseException e) {
                     logger.warn("Failed to parse specific datetime: {}", whenNotify.getDateTime(), e);
                 }
@@ -99,7 +99,7 @@ public class QueryService {
                         whenNotify.getStartDate().trim(), 
                         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                     );
-                    query.setValidFrom(startDate);
+                    TQuery.setValidFrom(startDate);
                 } catch (DateTimeParseException e) {
                     logger.warn("Failed to parse start date: {}", whenNotify.getStartDate(), e);
                 }
@@ -111,7 +111,7 @@ public class QueryService {
                         whenNotify.getEndDate().trim(), 
                         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                     );
-                    query.setValidTo(endDate);
+                    TQuery.setValidTo(endDate);
                 } catch (DateTimeParseException e) {
                     logger.warn("Failed to parse end date: {}", whenNotify.getEndDate(), e);
                 }
@@ -121,22 +121,22 @@ public class QueryService {
         // Map summary fields
         if (response.getSummary() != null) {
             ChatGptValidationResponse.Summary summary = response.getSummary();
-            query.setSummaryText(summary.getText());
-            query.setLanguage(summary.getLanguage());
-            query.setCategory(summary.getCategory());
+            TQuery.setSummaryText(summary.getText());
+            TQuery.setLanguage(summary.getLanguage());
+            TQuery.setCategory(summary.getCategory());
         }
         
         // Map metadata fields
         if (response.getMetadata() != null) {
             ChatGptValidationResponse.Metadata metadata = response.getMetadata();
-            query.setModelVersion(metadata.getModelVersion());
-            query.setConfidenceScore(metadata.getConfidenceScore());
-            query.setPolicyEnforced(metadata.getPolicyEnforced());
+            TQuery.setModelVersion(metadata.getModelVersion());
+            TQuery.setConfidenceScore(metadata.getConfidenceScore());
+            TQuery.setPolicyEnforced(metadata.getPolicyEnforced());
             
             // Convert tags array to JSON string
             if (metadata.getTags() != null && metadata.getTags().length > 0) {
                 try {
-                    query.setTags(objectMapper.writeValueAsString(metadata.getTags()));
+                    TQuery.setTags(objectMapper.writeValueAsString(metadata.getTags()));
                 } catch (Exception e) {
                     logger.warn("Failed to serialize tags: {}", e.getMessage());
                 }
@@ -144,30 +144,30 @@ public class QueryService {
         }
         
         logger.info("Mapped ChatGPT validation response to query: cron={}, specific={}, check={}, valid={}", 
-                   query.getCron(), query.getDateSpecific(), query.getToCheck(), query.getIsValid());
+                   TQuery.getCron(), TQuery.getDateSpecific(), TQuery.getToCheck(), TQuery.getIsValid());
     }
     
-    public Query createFallbackQuery(User user, String prompt) {
-        Query query = new Query(user, prompt);
-        query.setIsValid(false);
-        query.setInvalidReason("Failed to parse ChatGPT validation response");
+    public TQuery createFallbackQuery(TUser TUser, String prompt) {
+        TQuery TQuery = new TQuery(TUser, prompt);
+        TQuery.setIsValid(false);
+        TQuery.setInvalidReason("Failed to parse ChatGPT validation response");
         
-        Query savedQuery = queryRepository.save(query);
+        TQuery savedTQuery = queryRepository.save(TQuery);
         logger.info("Created fallback query with ID: {} for user: {} (invalid due to parsing error)", 
-                   savedQuery.getId(), user.getEmail());
+                   savedTQuery.getId(), TUser.getEmail());
         
-        return savedQuery;
+        return savedTQuery;
     }
     
-    public List<Query> findByUser(User user) {
-        return queryRepository.findByUserOrderByCreatedAtDesc(user);
+    public List<TQuery> findByUser(TUser TUser) {
+        return queryRepository.findByUserOrderByCreatedAtDesc(TUser);
     }
     
-    public List<Query> findValidQueriesByUser(User user) {
-        return queryRepository.findByUserAndIsValid(user, true);
+    public List<TQuery> findValidQueriesByUser(TUser TUser) {
+        return queryRepository.findByUserAndIsValid(TUser, true);
     }
     
-    public List<Query> findQueriesReadyForExecution() {
+    public List<TQuery> findQueriesReadyForExecution() {
         return queryRepository.findByIsValidAndNextExecutionBefore(true, LocalDateTime.now());
     }
     

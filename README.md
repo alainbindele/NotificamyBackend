@@ -1,6 +1,6 @@
 # NotifyMe Backend
 
-Spring Boot backend service for the NotifyMe application that processes user prompts and integrates with ChatGPT API using Auth0 JWT authentication.
+Spring Boot backend service for the NotifyMe application that processes TUser prompts and integrates with ChatGPT API using Auth0 JWT authentication.
 
 ## Features
 
@@ -34,7 +34,7 @@ The application requires the following Auth0 configuration:
 ## API Endpoints
 
 ### POST /api/v1/validate-prompt
-Process a user prompt and get AI-generated response.
+Process a TUser prompt and get AI-generated response.
 
 **Headers:**
 ```
@@ -46,7 +46,7 @@ Content-Type: application/json
 ```json
 {
   "prompt": "Notify me about my daily standup meeting",
-  "email": "user@example.com"
+  "email": "TUser@example.com"
 }
 ```
 
@@ -59,8 +59,8 @@ Content-Type: application/json
 }
 ```
 
-### GET /api/v1/user-info
-Get authenticated user information.
+### GET /api/v1/TUser-info
+Get authenticated TUser information.
 
 **Headers:**
 ```
@@ -73,8 +73,8 @@ Authorization: Bearer <jwt-token>
   "success": true,
   "message": "User information retrieved",
   "data": {
-    "id": "auth0|user-id",
-    "email": "user@example.com",
+    "id": "auth0|TUser-id",
+    "email": "TUser@example.com",
     "roles": ["ROLE_USER"]
   }
 }
@@ -125,7 +125,7 @@ The application uses YAML configuration in `application.yml`. Key settings:
 ### SQL Injection Protection
 - Pattern-based detection of common SQL injection attempts
 - Input sanitization and validation
-- Length limits on user input
+- Length limits on TUser input
 
 ### Input Validation
 - Jakarta Bean Validation annotations
@@ -191,7 +191,7 @@ curl -X POST http://localhost:8080/api/v1/validate-prompt \
 
 ### Testing User Info Endpoint
 ```bash
-curl -X GET http://localhost:8080/api/v1/user-info \
+curl -X GET http://localhost:8080/api/v1/TUser-info \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -253,7 +253,7 @@ const response = await fetch('/api/v1/validate-prompt', {
   },
   body: JSON.stringify({
     prompt: 'Your prompt here',
-    email: 'user@example.com'
+    email: 'TUser@example.com'
   })
 });
 ```
@@ -278,7 +278,7 @@ This version replaces the previous API key authentication system with JWT tokens
 - Removed keychain database table and related entities
 - Added JWT authentication filter with Auth0 integration
 - Updated security configuration for OAuth2 resource server
-- Added user information endpoint
+- Added TUser information endpoint
 - Updated all API endpoints to work with JWT authentication
 
 If you're migrating from the previous version, you'll need to:

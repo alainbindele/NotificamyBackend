@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Table(name = "executions")
 @Data
 @NoArgsConstructor
-public class Execution {
+public class TExecution {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -18,7 +18,7 @@ public class Execution {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "query_id", nullable = false)
-    private Query query;
+    private TQuery TQuery;
     
     @Column(name = "executed_at")
     private LocalDateTime executedAt;
@@ -33,8 +33,8 @@ public class Execution {
         SUCCESS, FAILED
     }
     
-    public Execution(Query query, ExecutionStatus status, String response) {
-        this.query = query;
+    public TExecution(TQuery TQuery, ExecutionStatus status, String response) {
+        this.TQuery = TQuery;
         this.status = status;
         this.response = response;
         this.executedAt = LocalDateTime.now();

@@ -11,7 +11,7 @@ import java.util.List;
 @Table(name = "queries")
 @Data
 @NoArgsConstructor
-public class Query {
+public class TQuery {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,7 +19,7 @@ public class Query {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    private TUser TUser;
     
     @Column(columnDefinition = "TEXT", nullable = false)
     private String prompt;
@@ -111,14 +111,14 @@ public class Query {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
-    @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Execution> executions;
+    @OneToMany(mappedBy = "TQuery", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TExecution> TExecutions;
     
-    @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Notification> notifications;
+    @OneToMany(mappedBy = "TQuery", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TNotification> TNotifications;
     
-    public Query(User user, String prompt) {
-        this.user = user;
+    public TQuery(TUser TUser, String prompt) {
+        this.TUser = TUser;
         this.prompt = prompt;
         this.createdAt = LocalDateTime.now();
     }

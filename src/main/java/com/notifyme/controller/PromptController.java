@@ -4,7 +4,7 @@ import com.notifyme.dto.ApiResponse;
 import com.notifyme.dto.ChatGptResponse;
 import com.notifyme.dto.ChatGptValidationResponse;
 import com.notifyme.dto.PromptRequest;
-import com.notifyme.entity.User;
+import com.notifyme.entity.TUser;
 import com.notifyme.service.ChatGptService;
 import com.notifyme.service.SecurityService;
 import com.notifyme.service.UserService;
@@ -90,15 +90,15 @@ public class PromptController {
             logger.info("Processing sanitized prompt for user {}: {}", userId, sanitizedPrompt);
 
             // Save or find user in database with notification channels
-            User user = null;
+            TUser TUser = null;
             if (emailToSave != null && !emailToSave.isEmpty()) {
-                user = userService.findOrCreateUserWithChannels(
+                TUser = userService.findOrCreateUserWithChannels(
                     emailToSave, 
                     request.getChannels(), 
                     sanitizedChannelConfigs
                 );
                 logger.info("User found/created with ID: {} and email: {} with notification channels updated", 
-                           user.getId(), user.getEmail());
+                           TUser.getId(), TUser.getEmail());
             }
 
             // Send to ChatGPT synchronously
@@ -113,8 +113,8 @@ public class PromptController {
                     ChatGptValidationResponse validationResponse = objectMapper.readValue(content, ChatGptValidationResponse.class);
                     
                     // Save query to database with complete validation data
-                    if (user != null) {
-                        var savedQuery = queryService.createQuery(user, sanitizedPrompt, validationResponse);
+                    if (TUser != null) {
+                        var savedQuery = queryService.createQuery(TUser, sanitizedPrompt, validationResponse);
                         
                         // Update query with enabled channels
                         if (request.getChannels() != null && !request.getChannels().isEmpty()) {
@@ -134,12 +134,12 @@ public class PromptController {
                         logger.info("Validation results for user {}: valid={}, cron={}, specific={}, check={}, reason={}", 
                                    userId, 
                                    validationResponse.getValidity().getValidPrompt(),
-                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getType() != null ? 
-                                       validationResponse.getWhenNotify().getType().getCron() : false,
-                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getType() != null ? 
-                                       validationResponse.getWhenNotify().getType().getSpecific() : false,
-                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getType() != null ? 
-                                       validationResponse.getWhenNotify().getType().getCheck() : false,
+                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getTimeType() != null ?
+                                       validationResponse.getWhenNotify().getTimeType().getCron() : false,
+                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getTimeType() != null ?
+                                       validationResponse.getWhenNotify().getTimeType().getSpecific() : false,
+                                   validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getTimeType() != null ?
+                                       validationResponse.getWhenNotify().getTimeType().getCheck() : false,
                                    validationResponse.getValidity().getInvalidReason());
                     }
                     
@@ -148,8 +148,8 @@ public class PromptController {
                     logger.debug("Raw ChatGPT response that failed to parse: {}", content);
                     
                     // Save query anyway, but mark as invalid due to parsing error
-                    if (user != null) {
-                        queryService.createFallbackQuery(user, sanitizedPrompt);
+                    if (TUser != null) {
+                        queryService.createFallbackQuery(TUser, sanitizedPrompt);
                         logger.info("Fallback query saved for user: {}", userId);
                     }
                 }

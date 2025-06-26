@@ -1,5 +1,5 @@
 -- Query MySQL per aggiornare le tabelle esistenti con i nuovi campi
--- Eseguire queste query in sequenza sul database MySQL esistente
+-- Eseguire queste TQuery in sequenza sul database MySQL esistente
 
 -- =====================================================
 -- AGGIORNAMENTO TABELLA QUERIES
@@ -69,10 +69,10 @@ CREATE INDEX idx_queries_specific_datetime ON queries(specific_datetime);
 -- Indice per il campo closed
 CREATE INDEX idx_queries_closed ON queries(closed);
 
--- Indice composto per query attive
+-- Indice composto per TQuery attive
 CREATE INDEX idx_queries_active ON queries(is_valid, closed);
 
--- Indice composto per query pronte all'esecuzione
+-- Indice composto per TQuery pronte all'esecuzione
 CREATE INDEX idx_queries_execution_ready ON queries(is_valid, next_execution, closed);
 
 -- =====================================================
@@ -85,10 +85,10 @@ DESCRIBE queries;
 -- Verifica gli indici creati
 SHOW INDEX FROM queries;
 
--- Conta le query esistenti per verificare che i dati non siano stati persi
+-- Conta le TQuery esistenti per verificare che i dati non siano stati persi
 SELECT COUNT(*) as total_queries FROM queries;
 
--- Verifica che i nuovi campi siano NULL per le query esistenti (comportamento atteso)
+-- Verifica che i nuovi campi siano NULL per le TQuery esistenti (comportamento atteso)
 SELECT 
     COUNT(*) as total,
     COUNT(cron) as cron_not_null,
@@ -101,14 +101,14 @@ FROM queries;
 -- QUERY OPZIONALI DI PULIZIA/MIGRAZIONE DATI
 -- =====================================================
 
--- Se vuoi impostare valori di default per le query esistenti:
+-- Se vuoi impostare valori di default per le TQuery esistenti:
 
--- Imposta closed = FALSE per tutte le query esistenti (se non già impostato)
+-- Imposta closed = FALSE per tutte le TQuery esistenti (se non già impostato)
 UPDATE queries 
 SET closed = FALSE 
 WHERE closed IS NULL;
 
--- Imposta i flag di tipo a FALSE per le query esistenti (se non già impostato)
+-- Imposta i flag di tipo a FALSE per le TQuery esistenti (se non già impostato)
 UPDATE queries 
 SET 
     cron = FALSE,
@@ -120,19 +120,19 @@ WHERE cron IS NULL OR date_specific IS NULL OR to_check IS NULL;
 -- QUERY DI TEST PER VERIFICARE IL FUNZIONAMENTO
 -- =====================================================
 
--- Test per trovare query per tipo (dovrebbe funzionare dopo l'aggiornamento)
+-- Test per trovare TQuery per tipo (dovrebbe funzionare dopo l'aggiornamento)
 SELECT id, prompt, cron, date_specific, to_check 
 FROM queries 
 WHERE cron = TRUE 
 LIMIT 5;
 
--- Test per trovare query attive
+-- Test per trovare TQuery attive
 SELECT id, prompt, is_valid, closed 
 FROM queries 
 WHERE is_valid = TRUE AND (closed = FALSE OR closed IS NULL)
 LIMIT 5;
 
--- Test per trovare query con periodo di validità
+-- Test per trovare TQuery con periodo di validità
 SELECT id, prompt, valid_from, valid_to, next_execution
 FROM queries 
 WHERE valid_from IS NOT NULL OR valid_to IS NOT NULL
@@ -142,7 +142,7 @@ LIMIT 5;
 -- BACKUP RACCOMANDATO PRIMA DELL'ESECUZIONE
 -- =====================================================
 
--- IMPORTANTE: Prima di eseguire queste query, crea un backup del database:
+-- IMPORTANTE: Prima di eseguire queste TQuery, crea un backup del database:
 -- mysqldump -u username -p database_name > backup_before_update.sql
 
 -- =====================================================

@@ -1,6 +1,6 @@
 package com.notifyme.service;
 
-import com.notifyme.entity.User;
+import com.notifyme.entity.TUser;
 import com.notifyme.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +20,7 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
     
-    public User findOrCreateUser(String email) {
+    public TUser findOrCreateUser(String email) {
         if (email == null || email.trim().isEmpty()) {
             throw new IllegalArgumentException("Email cannot be null or empty");
         }
@@ -28,31 +28,31 @@ public class UserService {
         return userRepository.findByEmail(email)
                 .orElseGet(() -> {
                     logger.info("Creating new user with email: {}", email);
-                    User newUser = new User(email);
-                    return userRepository.save(newUser);
+                    TUser newTUser = new TUser(email);
+                    return userRepository.save(newTUser);
                 });
     }
     
-    public User findOrCreateUserWithChannels(String email, List<String> channels, Map<String, String> channelConfigs) {
+    public TUser findOrCreateUserWithChannels(String email, List<String> channels, Map<String, String> channelConfigs) {
         if (email == null || email.trim().isEmpty()) {
             throw new IllegalArgumentException("Email cannot be null or empty");
         }
         
-        User user = userRepository.findByEmail(email)
+        TUser TUser = userRepository.findByEmail(email)
                 .orElseGet(() -> {
                     logger.info("Creating new user with email: {}", email);
-                    return new User(email);
+                    return new TUser(email);
                 });
         
         // Aggiorna i canali di notifica se forniti
         if (channels != null && channelConfigs != null) {
-            updateUserChannels(user, channels, channelConfigs);
+            updateUserChannels(TUser, channels, channelConfigs);
         }
         
-        return userRepository.save(user);
+        return userRepository.save(TUser);
     }
     
-    private void updateUserChannels(User user, List<String> channels, Map<String, String> channelConfigs) {
+    private void updateUserChannels(TUser user, List<String> channels, Map<String, String> channelConfigs) {
         logger.info("Updating notification channels for user: {}", user.getEmail());
         
         for (String channel : channels) {
@@ -90,7 +90,7 @@ public class UserService {
         return webhook.substring(0, 10) + "***" + webhook.substring(webhook.length() - 5);
     }
     
-    public User findByEmail(String email) {
+    public TUser findByEmail(String email) {
         return userRepository.findByEmail(email).orElse(null);
     }
     

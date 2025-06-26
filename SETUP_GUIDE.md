@@ -206,8 +206,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=ec2-user
-WorkingDirectory=/home/ec2-user/notifyme-backend
+User=ec2-TUser
+WorkingDirectory=/home/ec2-TUser/notifyme-backend
 ExecStart=/usr/bin/java -jar target/notifyme-backend-0.0.1-SNAPSHOT.jar
 Restart=always
 RestartSec=10
@@ -220,7 +220,7 @@ Environment=OPENAI_API_KEY=your_openai_api_key
 Environment=SERVER_PORT=8080
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-TUser.target
 ```
 
 Avvia il servizio:
@@ -245,7 +245,7 @@ const token = await getAccessTokenSilently({
   audience: 'https://notificamy.com/api'
 });
 
-const response = await fetch('https://notificamy.com/api/v1/user-info', {
+const response = await fetch('https://notificamy.com/api/v1/TUser-info', {
   headers: {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'

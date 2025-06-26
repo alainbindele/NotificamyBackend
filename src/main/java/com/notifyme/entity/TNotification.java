@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Table(name = "notifications")
 @Data
 @NoArgsConstructor
-public class Notification {
+public class TNotification {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -18,11 +18,11 @@ public class Notification {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    private TUser TUser;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "query_id")
-    private Query query;
+    private TQuery TQuery;
     
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
@@ -32,9 +32,9 @@ public class Notification {
     @Column(columnDefinition = "TEXT")
     private String content;
     
-    public Notification(User user, Query query, String subject, String content) {
-        this.user = user;
-        this.query = query;
+    public TNotification(TUser TUser, TQuery TQuery, String subject, String content) {
+        this.TUser = TUser;
+        this.TQuery = TQuery;
         this.subject = subject;
         this.content = content;
         this.sentAt = LocalDateTime.now();

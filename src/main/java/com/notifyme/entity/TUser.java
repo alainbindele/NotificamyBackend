@@ -11,7 +11,7 @@ import java.util.List;
 @Table(name = "users")
 @Data
 @NoArgsConstructor
-public class User {
+public class TUser {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,13 +32,13 @@ public class User {
     @Column(name = "whatsapp_phone", length = 30)
     private String phone = "";
     
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Query> queries;
+    @OneToMany(mappedBy = "TUser", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TQuery> queries;
     
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Notification> notifications;
+    @OneToMany(mappedBy = "TUser", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TNotification> TNotifications;
     
-    public User(String email) {
+    public TUser(String email) {
         this.email = email;
         this.createdAt = LocalDateTime.now();
     }
