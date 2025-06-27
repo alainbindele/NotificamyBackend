@@ -160,7 +160,7 @@ public class ChatGptService {
                              (es. - se il prompt richiede "ogni giorno alle 18" imposta con "CRON" con true altrimenti false
                                   - se richiede "il giorno 15 AGOSTO alle 20" imposta con "SPECIFIC" con true altrimenti false 
                                   - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$" imposta come "CHECK" con "true" altrimenti false 
-                                  - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$ controllando ogni giorno alle 21:30" allora questa è sia SPECIFIC che CRON che CHECK
+                                  - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$ controllando ogni giorno alle 21:30" allora questa è sia CRON che CHECK
                                   - se richiede "dimmi se il prezzo di bitcoin è sceso sotto i 500$ controllando il giorno 21 agosto alle 21:30" allora questa è sia SPECIFIC che CHECK ma non CRON
                                   - generalizza questi esempi su tutti gli altri casi che ti vengono richiesti
                                     
