@@ -2,6 +2,8 @@ package com.notifyme.service;
 
 import com.notifyme.dto.ChatGptRequest;
 import com.notifyme.dto.ChatGptResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,9 +16,10 @@ import java.time.Duration;
 @Service
 public class ChatGptService {
 
+    private static final Logger logger = LoggerFactory.getLogger(ChatGptService.class);
     private final WebClient webClient;
     
-    @Value("${openai.api.key:}")
+    @Value("${openai.api.key}")
     private String apiKey;
     
     @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
@@ -42,10 +45,20 @@ public class ChatGptService {
 
     public ChatGptResponse sendPromptToChatGptSync(String prompt) {
         try {
+            // Verifica che la chiave API sia presente
+            if (apiKey == null || apiKey.trim().isEmpty() || apiKey.equals("${OPENAI_API_KEY}")) {
+                logger.error("OpenAI API key is not configured properly. Current value: {}", 
+                           apiKey != null ? (apiKey.length() > 10 ? apiKey.substring(0, 10) + "..." : apiKey) : "null");
+                throw new RuntimeException("OpenAI API key is not configured. Please set OPENAI_API_KEY environment variable.");
+            }
+            
+            logger.info("Sending request to OpenAI API: {}", apiUrl);
+            logger.debug("Using API key starting with: {}", apiKey.substring(0, Math.min(10, apiKey.length())) + "...");
+            
             String policy = buildPolicy();
             ChatGptRequest request = new ChatGptRequest(policy, prompt);
 
-            return webClient.post()
+            ChatGptResponse response = webClient.post()
                     .uri(apiUrl)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                     .bodyValue(buildOpenAiRequest(request))
@@ -53,7 +66,12 @@ public class ChatGptService {
                     .bodyToMono(ChatGptResponse.class)
                     .timeout(Duration.ofSeconds(30))
                     .block();
+                    
+            logger.info("Successfully received response from OpenAI API");
+            return response;
+            
         } catch (Exception e) {
+            logger.error("Failed to get response from ChatGPT: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to get response from ChatGPT: " + e.getMessage(), e);
         }
     }

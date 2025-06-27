@@ -46,7 +46,7 @@ auth0:
   domain: ${AUTH0_DOMAIN}
   audience: ${AUTH0_AUDIENCE}
 
-# OpenAI Configuration
+# OpenAI Configuration - CRITICAL: Remove default empty value
 openai:
   api:
     key: ${OPENAI_API_KEY}
