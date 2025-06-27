@@ -160,6 +160,10 @@ public class ChatGptService {
                              (es. - se il prompt richiede "ogni giorno alle 18" imposta con "CRON" con true altrimenti false
                                   - se richiede "il giorno 15 AGOSTO alle 20" imposta con "SPECIFIC" con true altrimenti false 
                                   - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$" imposta come "CHECK" con "true" altrimenti false 
+                                  - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$ controllando ogni giorno alle 21:30" allora questa è sia SPECIFIC che CRON che CHECK
+                                  - se richiede "dimmi se il prezzo di bitcoin è sceso sotto i 500$ controllando il giorno 21 agosto alle 21:30" allora questa è sia SPECIFIC che CHECK ma non CRON
+                                  - generalizza questi esempi su tutti gli altri casi che ti vengono richiesti
+                                    
                               )       
                  SOSTITUISCI {CRON_ESPRESSION} con l'espressione CRONTAB standard di linux che rappresenta il cron che potrebbe essere impostato per quella specifica richiesta (ovviamente se è rilevato CRON come true in "when_notify->type") altrimenti null
                  SOSTITUISCI {YYYY-MM-DD HH24:MI:SS} con il datetime in questo formato se rilevi SPECIFIC come true altrimenti null
