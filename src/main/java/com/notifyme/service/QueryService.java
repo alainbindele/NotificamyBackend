@@ -77,21 +77,7 @@ public class QueryService {
                 query.setCronParams(whenNotify.getCronExpression().trim());
                 query.setNextExecution(calculateNextCronExecution(whenNotify.getCronExpression()));
             }
-            
-            // Map specific datetime
-            if (whenNotify.getDateTime() != null && !whenNotify.getDateTime().trim().isEmpty()) {
-                try {
-                    LocalDateTime specificDateTime = LocalDateTime.parse(
-                        whenNotify.getDateTime().trim(), 
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    );
-                    query.setSpecificDatetime(specificDateTime);
-                    query.setNextExecution(specificDateTime);
-                } catch (DateTimeParseException e) {
-                    logger.warn("Failed to parse specific datetime: {}", whenNotify.getDateTime(), e);
-                }
-            }
-            
+
             // Map validity period
             if (whenNotify.getStartDate() != null && !whenNotify.getStartDate().trim().isEmpty()) {
                 try {
