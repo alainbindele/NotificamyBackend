@@ -16,9 +16,7 @@ ADD COLUMN date_specific BOOLEAN DEFAULT FALSE AFTER cron,
 ADD COLUMN to_check BOOLEAN DEFAULT FALSE AFTER date_specific;
 
 -- 3. Aggiungere i campi di scheduling aggiuntivi
-ALTER TABLE queries 
-ADD COLUMN specific_datetime TIMESTAMP NULL AFTER next_execution,
-ADD COLUMN valid_from TIMESTAMP NULL AFTER specific_datetime,
+ALTER TABLE queries
 ADD COLUMN valid_to TIMESTAMP NULL AFTER valid_from;
 
 -- 4. Aggiungere il campo per i canali di notifica abilitati
@@ -64,7 +62,6 @@ CREATE INDEX idx_queries_to_check ON queries(to_check);
 -- Indici per i campi di validità temporale
 CREATE INDEX idx_queries_valid_from ON queries(valid_from);
 CREATE INDEX idx_queries_valid_to ON queries(valid_to);
-CREATE INDEX idx_queries_specific_datetime ON queries(specific_datetime);
 
 -- Indice per il campo closed
 CREATE INDEX idx_queries_closed ON queries(closed);
@@ -156,7 +153,6 @@ DROP COLUMN closed,
 DROP COLUMN cron,
 DROP COLUMN date_specific,
 DROP COLUMN to_check,
-DROP COLUMN specific_datetime,
 DROP COLUMN valid_from,
 DROP COLUMN valid_to,
 DROP COLUMN enabled_channels,
@@ -181,7 +177,6 @@ DROP INDEX idx_queries_date_specific ON queries;
 DROP INDEX idx_queries_to_check ON queries;
 DROP INDEX idx_queries_valid_from ON queries;
 DROP INDEX idx_queries_valid_to ON queries;
-DROP INDEX idx_queries_specific_datetime ON queries;
 DROP INDEX idx_queries_closed ON queries;
 DROP INDEX idx_queries_active ON queries;
 DROP INDEX idx_queries_execution_ready ON queries;

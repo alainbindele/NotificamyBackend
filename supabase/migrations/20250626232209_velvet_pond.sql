@@ -30,8 +30,7 @@ CREATE TABLE queries (
     -- Scheduling fields
     cron_params VARCHAR(100),
     next_execution TIMESTAMP NULL,
-    specific_datetime TIMESTAMP NULL,
-    
+
     -- Validity period
     valid_from TIMESTAMP NULL,
     valid_to TIMESTAMP NULL,

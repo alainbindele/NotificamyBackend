@@ -47,10 +47,7 @@ public class TQuery {
     
     @Column(name = "next_execution")
     private LocalDateTime nextExecution;
-    
-    @Column(name = "specific_datetime")
-    private LocalDateTime specificDatetime;
-    
+
     // Validity period
     @Column(name = "valid_from")
     private LocalDateTime validFrom;
