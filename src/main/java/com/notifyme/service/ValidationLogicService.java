@@ -178,7 +178,7 @@ public class ValidationLogicService {
     }
     
     /**
-     * Applica la logica dei casi 0-5
+     * Applica la logica dei casi 0-5 - MIGLIORATO per riconoscere meglio i pattern
      */
     private void applyCaseLogic(TQuery query, String prompt, TemporalReference temporalRef) {
         boolean hasEvent = hasEventCondition(prompt);
@@ -186,10 +186,26 @@ public class ValidationLogicService {
         boolean hasRecurringTime = temporalRef.hasRecurringPattern();
         boolean hasCheckInterval = temporalRef.hasCheckInterval();
         
-        logger.debug("Prompt analysis - hasEvent: {}, hasSpecificTime: {}, hasRecurringTime: {}, hasCheckInterval: {}", 
-                    hasEvent, hasSpecificTime, hasRecurringTime, hasCheckInterval);
+        // MIGLIORAMENTO: Se ha "controllando ogni" o "controlla ogni", è sempre ricorrente
+        boolean hasControlPattern = hasControlPattern(prompt);
+        if (hasControlPattern && !hasRecurringTime) {
+            // Forza il pattern ricorrente se c'è un controllo
+            hasRecurringTime = true;
+            // Crea un cron di default se non estratto
+            if (temporalRef.getCronExpression() == null) {
+                temporalRef.setCronExpression("0 10 * * *"); // Default ogni giorno alle 10
+            }
+        }
         
-        if (hasEvent && !hasSpecificTime && !hasRecurringTime) {
+        logger.debug("Prompt analysis - hasEvent: {}, hasSpecificTime: {}, hasRecurringTime: {}, hasCheckInterval: {}, hasControlPattern: {}", 
+                    hasEvent, hasSpecificTime, hasRecurringTime, hasCheckInterval, hasControlPattern);
+        
+        if (hasEvent && !hasSpecificTime && hasRecurringTime) {
+            // Caso 4: notificami ogni [riferimento_temporale_intervallo] [se_evento]
+            // INCLUDE: "notificami se X controllando ogni Y"
+            applyCaso4(query, temporalRef);
+            
+        } else if (hasEvent && !hasSpecificTime && !hasRecurringTime) {
             // Caso 0: notificami [se_evento]
             applyCaso0(query, temporalRef);
             
@@ -205,20 +221,27 @@ public class ValidationLogicService {
             // Caso 3: notificami il [riferimento_temporale] [se_evento]
             applyCaso3(query, temporalRef);
             
-        } else if (hasEvent && !hasSpecificTime && hasRecurringTime && !hasCheckInterval) {
-            // Caso 4: notificami ogni [riferimento_temporale_intervallo] [se_evento]
-            applyCaso4(query, temporalRef);
-            
         } else if (hasEvent && hasSpecificTime && hasCheckInterval) {
             // Caso 5: notificami il [riferimento_temporale] [se_evento] e controlla ogni [intervallo]
             applyCaso5(query, temporalRef);
             
         } else {
-            // Caso non riconosciuto
+            // Caso non riconosciuto - MIGLIORAMENTO: più dettagli nel debug
             query.setIsValid(false);
-            query.setInvalidReason("Configurazione temporale non riconosciuta o non supportata");
-            logger.warn("Unrecognized temporal configuration for prompt: {}", prompt);
+            query.setInvalidReason(String.format(
+                "Configurazione temporale non riconosciuta: hasEvent=%s, hasSpecificTime=%s, hasRecurringTime=%s, hasCheckInterval=%s, hasControlPattern=%s", 
+                hasEvent, hasSpecificTime, hasRecurringTime, hasCheckInterval, hasControlPattern
+            ));
+            logger.warn("Unrecognized temporal configuration for prompt: {} - Details: {}", prompt, query.getInvalidReason());
         }
+    }
+    
+    /**
+     * NUOVO: Verifica se il prompt contiene pattern di controllo
+     */
+    private boolean hasControlPattern(String prompt) {
+        Pattern controlPattern = Pattern.compile("(?i)\\b(controllando|controlla|controllo|checking|check)\\s+(ogni|every)\\b");
+        return controlPattern.matcher(prompt).find();
     }
     
     /**
@@ -308,6 +331,12 @@ public class ValidationLogicService {
         query.setDateSpecific(false);
         
         String cronExpression = temporalRef.getCronExpression();
+        if (cronExpression == null) {
+            // Fallback se non estratto correttamente
+            cronExpression = "0 10 * * *"; // Default ogni giorno alle 10
+            logger.warn("No cron expression extracted for Caso 4, using default: {}", cronExpression);
+        }
+        
         query.setCronParams(cronExpression);
         query.setNextExecution(cronExpressionService.getNextExecution(cronExpression));
         

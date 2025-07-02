@@ -26,14 +26,14 @@ public class TemporalReferenceService {
         "(?i)\\b(alle?|at)\\s+(\\d{1,2})(?::(\\d{2}))?(?:\\s*(am|pm|mattina|pomeriggio|sera))?\\b"
     );
     
-    // Pattern per intervalli ricorrenti
+    // Pattern per intervalli ricorrenti - MIGLIORATO per catturare "controllando ogni X"
     private static final Pattern RECURRING_PATTERN = Pattern.compile(
-        "(?i)\\b(ogni|every)\\s+(\\d+)?\\s*(minuto|minuti|minute|minutes|ora|ore|hour|hours|giorno|giorni|day|days|settimana|settimane|week|weeks|mese|mesi|month|months)(?:\\s+alle?\\s+(\\d{1,2})(?::(\\d{2}))?)?\\b"
+        "(?i)\\b(ogni|every|controllando\\s+ogni|controlla\\s+ogni)\\s+(\\d+)?\\s*(minuto|minuti|minute|minutes|ora|ore|hour|hours|giorno|giorni|day|days|settimana|settimane|week|weeks|mese|mesi|month|months)(?:\\s+alle?\\s+(\\d{1,2})(?::(\\d{2}))?)?\\b"
     );
     
-    // Pattern per intervalli di controllo
+    // Pattern per intervalli di controllo - NUOVO pattern specifico
     private static final Pattern CHECK_INTERVAL_PATTERN = Pattern.compile(
-        "(?i)\\bcontrolla\\s+ogni\\s+(\\d+)?\\s*(minuto|minuti|ora|ore|giorno|giorni|settimana|settimane)\\b"
+        "(?i)\\b(controllando|controlla|controllo|checking|check)\\s+(ogni|every)\\s+(\\d+)?\\s*(minuto|minuti|ora|ore|giorno|giorni|settimana|settimane)(?:\\s+alle?\\s+(\\d{1,2})(?::(\\d{2}))?)?\\b"
     );
     
     // Pattern per periodi di validità
@@ -52,10 +52,10 @@ public class TemporalReferenceService {
         // Estrai data/ora specifica
         extractSpecificDateTime(prompt, reference);
         
-        // Estrai pattern ricorrente
+        // Estrai pattern ricorrente (inclusi controlli)
         extractRecurringPattern(prompt, reference);
         
-        // Estrai intervallo di controllo
+        // Estrai intervallo di controllo specifico
         extractCheckInterval(prompt, reference);
         
         // Estrai periodo di validità
@@ -137,27 +137,29 @@ public class TemporalReferenceService {
     }
     
     /**
-     * Estrae pattern ricorrente
+     * Estrae pattern ricorrente - MIGLIORATO per "controllando ogni"
      */
     private void extractRecurringPattern(String prompt, TemporalReference reference) {
         Matcher matcher = RECURRING_PATTERN.matcher(prompt);
         
         if (matcher.find()) {
             try {
+                String trigger = matcher.group(1).toLowerCase(); // "ogni", "controllando ogni", etc.
                 String numberStr = matcher.group(2);
                 String unit = matcher.group(3).toLowerCase();
                 String hourStr = matcher.group(4);
                 String minuteStr = matcher.group(5);
                 
                 int number = numberStr != null ? Integer.parseInt(numberStr) : 1;
-                int hour = hourStr != null ? Integer.parseInt(hourStr) : 9; // Default 9 AM
+                int hour = hourStr != null ? Integer.parseInt(hourStr) : 
+                          (trigger.contains("controllando") || trigger.contains("controlla") ? 10 : 9); // Default diverso per controlli
                 int minute = minuteStr != null ? Integer.parseInt(minuteStr) : 0;
                 
                 String cronExpression = buildCronExpression(number, unit, hour, minute);
                 reference.setCronExpression(cronExpression);
                 
-                logger.debug("Extracted recurring pattern: {} {} at {}:{} -> cron: {}", 
-                           number, unit, hour, minute, cronExpression);
+                logger.debug("Extracted recurring pattern from '{}': {} {} at {}:{} -> cron: {}", 
+                           trigger, number, unit, hour, minute, cronExpression);
                 
             } catch (Exception e) {
                 logger.warn("Failed to parse recurring pattern: {}", matcher.group(), e);
@@ -166,22 +168,27 @@ public class TemporalReferenceService {
     }
     
     /**
-     * Estrae intervallo di controllo personalizzato
+     * Estrae intervallo di controllo personalizzato - MIGLIORATO
      */
     private void extractCheckInterval(String prompt, TemporalReference reference) {
         Matcher matcher = CHECK_INTERVAL_PATTERN.matcher(prompt);
         
         if (matcher.find()) {
             try {
-                String numberStr = matcher.group(1);
-                String unit = matcher.group(2).toLowerCase();
+                String numberStr = matcher.group(3);
+                String unit = matcher.group(4).toLowerCase();
+                String hourStr = matcher.group(5);
+                String minuteStr = matcher.group(6);
                 
                 int number = numberStr != null ? Integer.parseInt(numberStr) : 1;
+                int hour = hourStr != null ? Integer.parseInt(hourStr) : 0; // Per intervalli di controllo
+                int minute = minuteStr != null ? Integer.parseInt(minuteStr) : 0;
                 
-                String cronExpression = buildCheckIntervalCron(number, unit);
+                String cronExpression = buildCheckIntervalCron(number, unit, hour, minute);
                 reference.setCheckIntervalCron(cronExpression);
                 
-                logger.debug("Extracted check interval: {} {} -> cron: {}", number, unit, cronExpression);
+                logger.debug("Extracted check interval: {} {} at {}:{} -> cron: {}", 
+                           number, unit, hour, minute, cronExpression);
                 
             } catch (Exception e) {
                 logger.warn("Failed to parse check interval: {}", matcher.group(), e);
@@ -267,9 +274,9 @@ public class TemporalReferenceService {
     }
     
     /**
-     * Costruisce espressione cron per intervalli di controllo
+     * Costruisce espressione cron per intervalli di controllo - MIGLIORATO
      */
-    private String buildCheckIntervalCron(int number, String unit) {
+    private String buildCheckIntervalCron(int number, String unit, int hour, int minute) {
         switch (unit) {
             case "minuto":
             case "minuti":
@@ -277,15 +284,29 @@ public class TemporalReferenceService {
                 
             case "ora":
             case "ore":
-                return number == 1 ? "0 * * * *" : String.format("0 */%d * * *", number);
+                if (hour > 0 || minute > 0) {
+                    // Se è specificato un orario, usa quello
+                    return number == 1 ? String.format("%d * * * *", minute) : 
+                                       String.format("%d */%d * * *", minute, number);
+                } else {
+                    // Altrimenti usa il default
+                    return number == 1 ? "0 * * * *" : String.format("0 */%d * * *", number);
+                }
                 
             case "giorno":
             case "giorni":
-                return number == 1 ? "0 8 * * *" : String.format("0 8 */%d * *", number);
+                if (hour > 0 || minute > 0) {
+                    // Se è specificato un orario, usa quello
+                    return number == 1 ? String.format("%d %d * * *", minute, hour) : 
+                                       String.format("%d %d */%d * *", minute, hour, number);
+                } else {
+                    // Altrimenti usa il default (8 AM)
+                    return number == 1 ? "0 8 * * *" : String.format("0 8 */%d * *", number);
+                }
                 
             case "settimana":
             case "settimane":
-                return "0 8 * * 1"; // Ogni lunedì alle 8
+                return String.format("%d %d * * 1", minute, hour > 0 ? hour : 8); // Ogni lunedì
                 
             default:
                 return "0 * * * *"; // Default: ogni ora
