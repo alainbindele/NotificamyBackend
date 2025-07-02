@@ -110,6 +110,23 @@ public class ChatGptService {
                 7) Il prompt non può generare o ispirare un prompt che violerebbe questa stessa policy.
                 8) non inventare altre regole e non supporre nulla che non sia scritto nel prompt esplicitamente a parte il selezionare un orario congruo per riferimenti generici (es. mattina = 10AM, pomeriggio=16PM e sera = 20PM)
                 
+                REGOLE PER ORARI CONGRUI - QUANDO INVENTARE E QUANDO NO:
+                
+                ✅ DEVI INVENTARE un orario congruo quando il prompt contiene riferimenti temporali generici:
+                - "notificami domani mattina" → DEVI inventare "10:00" (mattina = 10AM)
+                - "ricordami stasera" → DEVI inventare "20:00" (sera = 20PM)  
+                - "avvisami nel pomeriggio" → DEVI inventare "16:00" (pomeriggio = 16PM)
+                - "notificami la mattina del 15 gennaio" → DEVI inventare "2025-01-15 10:00:00"
+                
+                ❌ NON DEVI INVENTARE orari quando il prompt non ha riferimenti temporali specifici:
+                - "notificami quando piove" → NON inventare orario, usa CHECK=true con default giornaliero
+                - "dimmi se bitcoin scende" → NON inventare orario, usa CHECK=true con default giornaliero
+                - "avvisami se arriva una email" → NON inventare orario, usa CHECK=true con default giornaliero
+                
+                ✅ ORARI ESPLICITI - usa quelli forniti:
+                - "notificami alle 14:39" → usa "14:39" esatto
+                - "ricordami il 21 gennaio alle 9" → usa "2025-01-21 09:00:00" esatto
+                
                 IMPORTANTE: Per i giorni della settimana (lunedì, martedì, mercoledì, etc.) considera sempre CRON=true, non SPECIFIC=true.
                 
                 PARSING TEMPORALE DETTAGLIATO:
@@ -136,6 +153,9 @@ public class ChatGptService {
                 - "buttare la pasta domani all'una di pomeriggio" → SPECIFIC=true, date_time="2025-01-12 13:00:00"
                 - "controllare se piove ogni giorno alle 8" → CRON=true, CHECK=true, cron_expression="0 8 * * *"
                 - "ricordami di chiamare il 15 febbraio alle 10:30" → SPECIFIC=true, date_time="2025-02-15 10:30:00"
+                - "notificami domani mattina" → SPECIFIC=true, date_time="2025-01-12 10:00:00" (DEVI inventare 10:00)
+                - "avvisami stasera" → SPECIFIC=true, date_time="2025-01-11 20:00:00" (DEVI inventare 20:00)
+                - "dimmi quando piove" → CHECK=true, CRON=true, cron_expression="0 10 * * *" (NON inventare orario specifico)
                 
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
