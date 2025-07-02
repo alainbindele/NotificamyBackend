@@ -133,7 +133,7 @@ public class ChatGptService {
                 
                 ESEMPI DI PARSING CORRETTO:
                 - "notificami ogni mercoledì alle 14:39" → CRON=true, cron_expression="39 14 * * 3"
-                - "buttare la pasta domani all'una di pomeriggio" → SPECIFIC=true, date_time="2025-01-XX 13:00:00"
+                - "buttare la pasta domani all'una di pomeriggio" → SPECIFIC=true, date_time="2025-01-12 13:00:00"
                 - "controllare se piove ogni giorno alle 8" → CRON=true, CHECK=true, cron_expression="0 8 * * *"
                 - "ricordami di chiamare il 15 febbraio alle 10:30" → SPECIFIC=true, date_time="2025-02-15 10:30:00"
                 
@@ -198,15 +198,15 @@ public class ChatGptService {
                  SOSTITUISCI {YYYY-MM-DD HH:MM:SS} con il datetime in questo formato se rilevi SPECIFIC come true altrimenti null
                  SOSTITUISCI {YYYY-MM-DD HH:MM:SS}" oppure null in start_time e/o end_time se richiesto che le notifiche abbiano un intervallo di validità specifico
                  TIENI A MENTE QUESTE POSSIBILI CONFIGURAZIONI PER QUANTO RIGUARDA I FLAG TYPE:
-                 cron            date_specific         to_check        Description
-                  0                    	0                   0           NOT_VALID
-                  1 					0					0			Simply recurrent
-                  1 					1					0			NOT_VALID
-                  0 					1 					0			Simply in a certain date/datetime
-                  0                    	0                   1           Check if a condition is met (default:daily i.e SET CRON ONCE A DAY AT 8AM )
-                  1 					0					1			Check if a condition is met with a specified frequency
-                  1 					1					1			Check if a condition is met in a certain date/datetime with a specified check frequency (CASO 5)
-                  0 					1 					1			Check if a condition is met in a certain date/datetime
+                 cron   date_specific         to_check        Description
+                  0          	0                   0           NOT_VALID
+                  1 					0					          0			      Simply recurrent
+                  1 					1					          0			      NOT_VALID
+                  0 					1 					        0			      Simply in a certain date/datetime
+                  0           0                   1           Check if a condition is met (default:daily i.e SET CRON ONCE A DAY AT 10AM )
+                  1 					0					          1			      Check if a condition is met with a specified frequency
+                  1 					1					          1			      Check if a condition is met in a certain date/datetime with a specified check frequency (CASO 5)
+                  0 					1 					        1			      Check if a condition is met in a certain date/datetime
                 I messaggi contrassegnati come "NOT_VALID" saranno invalidi per il fatto che non possono essere specifici e ricorrenti allo stesso tempo 
                 e non possono essere lasciati NON specificati tutti e 3 i campi type
                 """;
