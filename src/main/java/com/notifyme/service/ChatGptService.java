@@ -87,7 +87,7 @@ public class ChatGptService {
                 1) Deve indicare esplicitamente un riferimento all'intervallo temporale in cui essere eseguito 
                     oppure ad una data/tempo in cui essere notificato 
                     (se non viene specificata l'ora e/o giorno manda la notifica a mezzanotte, 
-                    se invece viene specificato qualcosa come "mattina, pomeriggio o sera" considera un orario mediano es: mattina= 10AM etc) 
+                    se invece viene specificato qualcosa come "mattina, pomeriggio o sera" considera un orario mediano es: mattina= 10AM, pomeriggio=16PM, sera=20PM) 
                 3) può contenere riferimenti a notifiche che richiedano il controllo periodico 
                     e condizionale di un certo evento (es. "cambio di prezzo di un prodotto", "cambio di prezzo di un prodotto in un certo periodo di tempo")
                     
@@ -112,6 +112,31 @@ public class ChatGptService {
                 
                 IMPORTANTE: Per i giorni della settimana (lunedì, martedì, mercoledì, etc.) considera sempre CRON=true, non SPECIFIC=true.
                 
+                PARSING TEMPORALE DETTAGLIATO:
+                Devi analizzare con precisione i riferimenti temporali e compilare correttamente i campi:
+                
+                1) CRON_EXPRESSION: Usa il formato standard cron "minuto ora giorno mese giorno_settimana"
+                   - Per "ogni mercoledì alle 14:39" → "39 14 * * 3" (3=mercoledì)
+                   - Per "ogni giorno alle 9" → "0 9 * * *"
+                   - Per "ogni ora" → "0 * * * *"
+                   - Per "ogni 2 ore" → "0 */2 * * *"
+                   - Giorni settimana: 1=lunedì, 2=martedì, 3=mercoledì, 4=giovedì, 5=venerdì, 6=sabato, 7=domenica
+                
+                2) DATE_TIME: Usa il formato "YYYY-MM-DD HH:MM:SS" per date/orari specifici
+                   - Per "domani all'una di pomeriggio" → calcola la data di domani e imposta "YYYY-MM-DD 13:00:00"
+                   - Per "il 21 gennaio alle 9" → "2025-01-21 09:00:00" (usa anno corrente se non specificato)
+                   - Per "stasera" → data di oggi con orario 20:00:00
+                   - Per "domani mattina" → data di domani con orario 10:00:00
+                
+                3) START_DATE/END_DATE: Solo se il prompt specifica un periodo di validità
+                   - Per "dal 1 gennaio al 31 marzo" → start_date="2025-01-01 00:00:00", end_date="2025-03-31 23:59:59"
+                
+                ESEMPI DI PARSING CORRETTO:
+                - "notificami ogni mercoledì alle 14:39" → CRON=true, cron_expression="39 14 * * 3"
+                - "buttare la pasta domani all'una di pomeriggio" → SPECIFIC=true, date_time="2025-01-XX 13:00:00"
+                - "controllare se piove ogni giorno alle 8" → CRON=true, CHECK=true, cron_expression="0 8 * * *"
+                - "ricordami di chiamare il 15 febbraio alle 10:30" → SPECIFIC=true, date_time="2025-02-15 10:30:00"
+                
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
                 {
@@ -124,10 +149,10 @@ public class ChatGptService {
                             "SPECIFIC":true|false,
                             "CHECK":true|false
                         },
-                        "cron_expression":"{CRON_ESPRESSION}",
-                        "date_time":"{YYYY-MM-DD HH24:MI:SS}"|null,
-                        "start_date":"{YYYY-MM-DD HH24:MI:SS}"|null,
-                        "end_date":"{YYYY-MM-DD HH24:MI:SS}"|null
+                        "cron_expression":"{CRON_ESPRESSION}"|null,
+                        "date_time":"{YYYY-MM-DD HH:MM:SS}"|null,
+                        "start_date":"{YYYY-MM-DD HH:MM:SS}"|null,
+                        "end_date":"{YYYY-MM-DD HH:MM:SS}"|null
                    },
                    "validity": {
                      "out_of_bounds_prompt_length": true|false,
@@ -170,8 +195,8 @@ public class ChatGptService {
                                     
                               )       
                  SOSTITUISCI {CRON_ESPRESSION} con l'espressione CRONTAB standard di linux che rappresenta il cron che potrebbe essere impostato per quella specifica richiesta (ovviamente se è rilevato CRON come true in "when_notify->type") altrimenti null
-                 SOSTITUISCI {YYYY-MM-DD HH24:MI:SS} con il datetime in questo formato se rilevi SPECIFIC come true altrimenti null
-                 SOSTITUISCI {YYYY-MM-DD HH24:MI:SS}" oppure null in start_time e/o end_time se richiesto che le notifiche abbiano un intervallo di validità specifico
+                 SOSTITUISCI {YYYY-MM-DD HH:MM:SS} con il datetime in questo formato se rilevi SPECIFIC come true altrimenti null
+                 SOSTITUISCI {YYYY-MM-DD HH:MM:SS}" oppure null in start_time e/o end_time se richiesto che le notifiche abbiano un intervallo di validità specifico
                  TIENI A MENTE QUESTE POSSIBILI CONFIGURAZIONI PER QUANTO RIGUARDA I FLAG TYPE:
                  cron            date_specific         to_check        Description
                   0                    	0                   0           NOT_VALID
