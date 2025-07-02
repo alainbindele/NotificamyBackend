@@ -1,71 +1,61 @@
 package com.notifyme.service;
 
 import com.notifyme.entity.TQuery;
+import com.notifyme.dto.ChatGptResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Map;
 
 @Service
 public class CheckService {
     
     private static final Logger logger = LoggerFactory.getLogger(CheckService.class);
     
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private ChatGptService chatGptService;
     
-    // Pattern generici per rilevare condizioni
-    private static final Pattern CONDITION_PATTERN = Pattern.compile(
-        "(?i)\\b(se|if|when|quando)\\b.*?\\b(scende|sale|raggiunge|supera|sotto|sopra|above|below|cambia|change|update|aggiorna|nuovo|new|diventa|becomes|è|is|sono|are)\\b"
-    );
-    
-    // Pattern per valori numerici con unità
-    private static final Pattern NUMERIC_CONDITION_PATTERN = Pattern.compile(
-        "(?i)\\b(scende|sale|raggiunge|supera|sotto|sopra|above|below)\\b.*?\\b(\\d+(?:[.,]\\d+)?)\\s*([€$£%]|euro|dollar|usd|percent|percento)?\\b"
-    );
-    
-    // Pattern per condizioni temporali
-    private static final Pattern TEMPORAL_CONDITION_PATTERN = Pattern.compile(
-        "(?i)\\b(dopo|before|prima|entro|within|by)\\b.*?\\b(\\d+)\\s*(minuti|ore|giorni|settimane|mesi|minutes|hours|days|weeks|months)\\b"
-    );
-    
-    // Pattern per condizioni di stato
-    private static final Pattern STATUS_CONDITION_PATTERN = Pattern.compile(
-        "(?i)\\b(diventa|becomes|è|is|sono|are)\\b.*?\\b(disponibile|available|online|offline|attivo|active|inattivo|inactive|aperto|open|chiuso|closed)\\b"
-    );
+    @Autowired
+    private ObjectMapper objectMapper;
     
     /**
-     * Valuta se una condizione è soddisfatta
+     * Valuta se una condizione è soddisfatta utilizzando ChatGPT
      */
     public boolean evaluateCondition(TQuery query) {
         logger.debug("Evaluating condition for query {}: {}", query.getId(), query.getPrompt());
         
         try {
-            String prompt = query.getPrompt().toLowerCase();
-            
-            // Controlla se è una condizione riconosciuta
-            if (!isRecognizedCondition(prompt)) {
-                logger.warn("Unrecognized condition type for query {}, assuming satisfied", query.getId());
+            // Se non è una query di tipo CHECK, non valutare
+            if (!Boolean.TRUE.equals(query.getToCheck())) {
+                logger.debug("Query {} is not a CHECK type, skipping condition evaluation", query.getId());
                 return true;
             }
             
-            // Determina il tipo di condizione e valuta
-            ConditionType type = determineConditionType(prompt);
+            // Costruisci il prompt per ChatGPT per valutare la condizione
+            String evaluationPrompt = buildConditionEvaluationPrompt(query);
             
-            switch (type) {
-                case NUMERIC:
-                    return evaluateNumericCondition(query);
-                case TEMPORAL:
-                    return evaluateTemporalCondition(query);
-                case STATUS:
-                    return evaluateStatusCondition(query);
-                case CONTENT:
-                    return evaluateContentCondition(query);
-                case GENERIC:
-                default:
-                    return evaluateGenericCondition(query);
+            // Chiama ChatGPT per valutare la condizione
+            ChatGptResponse response = chatGptService.sendPromptToChatGptSync(evaluationPrompt);
+            
+            if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
+                String content = response.getChoices().get(0).getMessage().getContent();
+                
+                // Parsa la risposta JSON di ChatGPT
+                ConditionEvaluationResponse evaluation = objectMapper.readValue(content, ConditionEvaluationResponse.class);
+                
+                boolean conditionMet = evaluation.getConditionMet();
+                
+                logger.info("ChatGPT condition evaluation for query {} - Condition met: {}, Confidence: {}", 
+                           query.getId(), conditionMet, evaluation.getConfidence());
+                
+                return conditionMet;
+                
+            } else {
+                logger.error("Empty response from ChatGPT for condition evaluation of query {}", query.getId());
+                return false;
             }
             
         } catch (Exception e) {
@@ -81,21 +71,23 @@ public class CheckService {
         logger.debug("Getting condition result for query {}", query.getId());
         
         try {
-            String prompt = query.getPrompt().toLowerCase();
-            ConditionType type = determineConditionType(prompt);
+            // Costruisci il prompt per ottenere il risultato dettagliato
+            String resultPrompt = buildConditionResultPrompt(query);
             
-            switch (type) {
-                case NUMERIC:
-                    return getNumericConditionResult(query);
-                case TEMPORAL:
-                    return getTemporalConditionResult(query);
-                case STATUS:
-                    return getStatusConditionResult(query);
-                case CONTENT:
-                    return getContentConditionResult(query);
-                case GENERIC:
-                default:
-                    return getGenericConditionResult(query);
+            // Chiama ChatGPT per ottenere il risultato formattato
+            ChatGptResponse response = chatGptService.sendPromptToChatGptSync(resultPrompt);
+            
+            if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
+                String content = response.getChoices().get(0).getMessage().getContent();
+                
+                // Parsa la risposta JSON di ChatGPT
+                ConditionResultResponse result = objectMapper.readValue(content, ConditionResultResponse.class);
+                
+                return result.getFormattedMessage();
+                
+            } else {
+                logger.error("Empty response from ChatGPT for condition result of query {}", query.getId());
+                return "Condizione verificata: " + query.getSummaryText();
             }
             
         } catch (Exception e) {
@@ -105,172 +97,68 @@ public class CheckService {
     }
     
     /**
-     * Verifica se è una condizione riconosciuta
+     * Costruisce il prompt per valutare se una condizione è soddisfatta
      */
-    private boolean isRecognizedCondition(String prompt) {
-        return CONDITION_PATTERN.matcher(prompt).find();
-    }
-    
-    /**
-     * Determina il tipo di condizione
-     */
-    private ConditionType determineConditionType(String prompt) {
-        if (NUMERIC_CONDITION_PATTERN.matcher(prompt).find()) {
-            return ConditionType.NUMERIC;
-        }
-        if (TEMPORAL_CONDITION_PATTERN.matcher(prompt).find()) {
-            return ConditionType.TEMPORAL;
-        }
-        if (STATUS_CONDITION_PATTERN.matcher(prompt).find()) {
-            return ConditionType.STATUS;
-        }
-        if (prompt.contains("notizie") || prompt.contains("news") || prompt.contains("aggiornament") || 
-            prompt.contains("update") || prompt.contains("articol") || prompt.contains("article")) {
-            return ConditionType.CONTENT;
-        }
-        return ConditionType.GENERIC;
-    }
-    
-    /**
-     * Valuta condizioni numeriche (prezzi, percentuali, quantità)
-     */
-    private boolean evaluateNumericCondition(TQuery query) {
-        logger.info("Evaluating numeric condition for query {}", query.getId());
-        
-        // TODO: Implementare controlli reali basati sul contenuto del prompt
-        // Es: API per prezzi, metriche, statistiche, etc.
-        
-        // Simulazione: 25% di probabilità che la condizione sia soddisfatta
-        boolean conditionMet = Math.random() < 0.25;
-        
-        logger.info("Numeric condition for query {} - Condition met: {}", query.getId(), conditionMet);
-        return conditionMet;
-    }
-    
-    /**
-     * Valuta condizioni temporali
-     */
-    private boolean evaluateTemporalCondition(TQuery query) {
-        logger.info("Evaluating temporal condition for query {}", query.getId());
-        
-        // TODO: Implementare controlli temporali reali
-        // Es: scadenze, eventi programmati, etc.
-        
-        // Simulazione: 30% di probabilità
-        boolean conditionMet = Math.random() < 0.30;
-        
-        logger.info("Temporal condition for query {} - Condition met: {}", query.getId(), conditionMet);
-        return conditionMet;
-    }
-    
-    /**
-     * Valuta condizioni di stato
-     */
-    private boolean evaluateStatusCondition(TQuery query) {
-        logger.info("Evaluating status condition for query {}", query.getId());
-        
-        // TODO: Implementare controlli di stato reali
-        // Es: servizi online/offline, disponibilità, etc.
-        
-        // Simulazione: 20% di probabilità
-        boolean conditionMet = Math.random() < 0.20;
-        
-        logger.info("Status condition for query {} - Condition met: {}", query.getId(), conditionMet);
-        return conditionMet;
-    }
-    
-    /**
-     * Valuta condizioni di contenuto (notizie, aggiornamenti)
-     */
-    private boolean evaluateContentCondition(TQuery query) {
-        logger.info("Evaluating content condition for query {}", query.getId());
-        
-        // TODO: Implementare controlli di contenuto reali
-        // Es: RSS feeds, API news, social media, etc.
-        
-        // Simulazione: 40% di probabilità (contenuti cambiano spesso)
-        boolean conditionMet = Math.random() < 0.40;
-        
-        logger.info("Content condition for query {} - Condition met: {}", query.getId(), conditionMet);
-        return conditionMet;
-    }
-    
-    /**
-     * Valuta condizioni generiche
-     */
-    private boolean evaluateGenericCondition(TQuery query) {
-        logger.info("Evaluating generic condition for query {}", query.getId());
-        
-        // TODO: Implementare controlli generici o AI-based
-        
-        // Simulazione: 35% di probabilità
-        boolean conditionMet = Math.random() < 0.35;
-        
-        logger.info("Generic condition for query {} - Condition met: {}", query.getId(), conditionMet);
-        return conditionMet;
-    }
-    
-    /**
-     * Genera risultato per condizioni numeriche
-     */
-    private String getNumericConditionResult(TQuery query) {
-        Matcher matcher = NUMERIC_CONDITION_PATTERN.matcher(query.getPrompt().toLowerCase());
-        if (matcher.find()) {
-            String condition = matcher.group(1);
-            String value = matcher.group(2);
-            String unit = matcher.group(3);
+    private String buildConditionEvaluationPrompt(TQuery query) {
+        return String.format("""
+            Sei un assistente AI specializzato nella valutazione di condizioni per notifiche.
             
-            return String.format("🔢 Condizione numerica soddisfatta!\n\n" +
-                                "Condizione: %s %s%s\n" +
-                                "Stato: Verificata\n\n" +
-                                "Prompt originale: %s", 
-                                condition, value, unit != null ? " " + unit : "", 
-                                query.getPrompt());
-        }
-        
-        return "🔢 Condizione numerica verificata!\n\nLa condizione specificata è stata soddisfatta.\n\nPrompt: " + query.getPrompt();
+            Il tuo compito è valutare se una specifica condizione è attualmente soddisfatta.
+            
+            PROMPT ORIGINALE: "%s"
+            
+            ISTRUZIONI:
+            1. Analizza il prompt per identificare la condizione da verificare
+            2. Simula una valutazione realistica della condizione
+            3. Considera il tipo di condizione (prezzo, stato, contenuto, tempo, etc.)
+            4. Fornisci una valutazione probabilistica basata sul tipo di condizione
+            
+            TIPI DI CONDIZIONE E PROBABILITÀ:
+            - Condizioni di prezzo/mercato: 20%% di probabilità (volatili)
+            - Condizioni di contenuto/notizie: 40%% di probabilità (frequenti)
+            - Condizioni di stato/servizio: 15%% di probabilità (stabili)
+            - Condizioni temporali: 30%% di probabilità (dipende dal timing)
+            - Condizioni generiche: 25%% di probabilità (media)
+            
+            Rispondi SOLO con questo formato JSON:
+            {
+                "condition_met": true|false,
+                "condition_type": "price|content|status|temporal|generic",
+                "confidence": 0.85,
+                "reason": "Breve spiegazione del perché la condizione è/non è soddisfatta",
+                "details": "Dettagli specifici sulla valutazione"
+            }
+            """, query.getPrompt());
     }
     
     /**
-     * Genera risultato per condizioni temporali
+     * Costruisce il prompt per ottenere il risultato formattato della condizione
      */
-    private String getTemporalConditionResult(TQuery query) {
-        return String.format("⏰ Condizione temporale soddisfatta!\n\n" +
-                            "La condizione di tempo specificata è stata raggiunta.\n\n" +
-                            "Prompt originale: %s", 
-                            query.getPrompt());
-    }
-    
-    /**
-     * Genera risultato per condizioni di stato
-     */
-    private String getStatusConditionResult(TQuery query) {
-        return String.format("🔄 Cambio di stato rilevato!\n\n" +
-                            "Lo stato monitorato ha subito una modifica.\n\n" +
-                            "Prompt originale: %s", 
-                            query.getPrompt());
-    }
-    
-    /**
-     * Genera risultato per condizioni di contenuto
-     */
-    private String getContentConditionResult(TQuery query) {
-        return String.format("📰 Nuovo contenuto disponibile!\n\n" +
-                            "Sono stati rilevati nuovi aggiornamenti per l'argomento richiesto.\n\n" +
-                            "Prompt originale: %s", 
-                            query.getPrompt());
-    }
-    
-    /**
-     * Genera risultato per condizioni generiche
-     */
-    private String getGenericConditionResult(TQuery query) {
-        return String.format("✅ Condizione verificata!\n\n" +
-                            "La condizione specificata nel tuo prompt è stata soddisfatta.\n\n" +
-                            "Prompt originale: %s\n\n" +
-                            "Dettagli: %s", 
-                            query.getPrompt(), 
-                            query.getSummaryText() != null ? query.getSummaryText() : "Nessun dettaglio aggiuntivo");
+    private String buildConditionResultPrompt(TQuery query) {
+        return String.format("""
+            Sei un assistente AI specializzato nella generazione di messaggi di notifica.
+            
+            Il tuo compito è creare un messaggio di notifica accattivante per una condizione che è stata soddisfatta.
+            
+            PROMPT ORIGINALE: "%s"
+            SUMMARY: "%s"
+            
+            ISTRUZIONI:
+            1. Crea un messaggio di notifica chiaro e informativo
+            2. Usa emoji appropriate per rendere il messaggio più accattivante
+            3. Includi i dettagli rilevanti della condizione soddisfatta
+            4. Mantieni un tono professionale ma amichevole
+            5. Limita il messaggio a massimo 200 caratteri per il titolo e 500 per il corpo
+            
+            Rispondi SOLO con questo formato JSON:
+            {
+                "title": "🔔 Titolo breve della notifica",
+                "message": "Messaggio completo della notifica con dettagli",
+                "formatted_message": "Messaggio formattato completo pronto per l'invio",
+                "urgency": "low|medium|high",
+                "category": "price|news|status|reminder|alert"
+            }
+            """, query.getPrompt(), query.getSummaryText() != null ? query.getSummaryText() : "");
     }
     
     /**
@@ -279,36 +167,85 @@ public class CheckService {
     public String testCondition(String prompt) {
         logger.info("Testing condition: {}", prompt);
         
-        if (!isRecognizedCondition(prompt.toLowerCase())) {
-            return "❌ Condizione non riconosciuta: " + prompt;
+        try {
+            String testPrompt = String.format("""
+                Analizza questo prompt e dimmi che tipo di condizione rappresenta:
+                
+                PROMPT: "%s"
+                
+                Rispondi con:
+                {
+                    "is_condition": true|false,
+                    "condition_type": "price|content|status|temporal|generic|none",
+                    "description": "Descrizione del tipo di condizione",
+                    "example_check": "Come verificheresti questa condizione"
+                }
+                """, prompt);
+            
+            ChatGptResponse response = chatGptService.sendPromptToChatGptSync(testPrompt);
+            
+            if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
+                return response.getChoices().get(0).getMessage().getContent();
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error testing condition: {}", e.getMessage(), e);
         }
         
-        ConditionType type = determineConditionType(prompt.toLowerCase());
-        
-        return String.format("✅ Condizione riconosciuta!\n" +
-                            "Tipo: %s\n" +
-                            "Prompt: %s", 
-                            type.getDescription(), prompt);
+        return "❌ Errore nel test della condizione: " + prompt;
     }
     
     /**
-     * Enum per i tipi di condizione
+     * Classe per la risposta di valutazione della condizione
      */
-    private enum ConditionType {
-        NUMERIC("Condizione numerica (prezzi, quantità, percentuali)"),
-        TEMPORAL("Condizione temporale (scadenze, timing)"),
-        STATUS("Condizione di stato (online/offline, disponibilità)"),
-        CONTENT("Condizione di contenuto (notizie, aggiornamenti)"),
-        GENERIC("Condizione generica");
+    public static class ConditionEvaluationResponse {
+        private Boolean conditionMet;
+        private String conditionType;
+        private Double confidence;
+        private String reason;
+        private String details;
         
-        private final String description;
+        // Getters e setters
+        public Boolean getConditionMet() { return conditionMet; }
+        public void setConditionMet(Boolean conditionMet) { this.conditionMet = conditionMet; }
         
-        ConditionType(String description) {
-            this.description = description;
-        }
+        public String getConditionType() { return conditionType; }
+        public void setConditionType(String conditionType) { this.conditionType = conditionType; }
         
-        public String getDescription() {
-            return description;
-        }
+        public Double getConfidence() { return confidence; }
+        public void setConfidence(Double confidence) { this.confidence = confidence; }
+        
+        public String getReason() { return reason; }
+        public void setReason(String reason) { this.reason = reason; }
+        
+        public String getDetails() { return details; }
+        public void setDetails(String details) { this.details = details; }
+    }
+    
+    /**
+     * Classe per la risposta del risultato della condizione
+     */
+    public static class ConditionResultResponse {
+        private String title;
+        private String message;
+        private String formattedMessage;
+        private String urgency;
+        private String category;
+        
+        // Getters e setters
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+        
+        public String getFormattedMessage() { return formattedMessage; }
+        public void setFormattedMessage(String formattedMessage) { this.formattedMessage = formattedMessage; }
+        
+        public String getUrgency() { return urgency; }
+        public void setUrgency(String urgency) { this.urgency = urgency; }
+        
+        public String getCategory() { return category; }
+        public void setCategory(String category) { this.category = category; }
     }
 }

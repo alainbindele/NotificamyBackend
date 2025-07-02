@@ -32,7 +32,7 @@ public class ChatGptService {
     }
 
     public Mono<ChatGptResponse> sendPromptToChatGpt(String prompt) {
-        String policy = buildPolicy();
+        String policy = buildValidationPolicy();
         ChatGptRequest request = new ChatGptRequest(policy, prompt);
 
         return webClient.post()
@@ -55,7 +55,17 @@ public class ChatGptService {
             logger.info("Sending request to OpenAI API: {}", apiUrl);
             logger.debug("Using API key starting with: {}", apiKey.substring(0, Math.min(10, apiKey.length())) + "...");
             
-            String policy = buildPolicy();
+            // Determina se è una richiesta di validazione o di valutazione condizione
+            String policy;
+            if (prompt.contains("valutazione di condizioni") || prompt.contains("condition_met") || 
+                prompt.contains("formatted_message") || prompt.contains("Testing condition")) {
+                // È una richiesta di valutazione condizione - usa policy semplificata
+                policy = "Sei un assistente AI. Rispondi in formato JSON come richiesto.";
+            } else {
+                // È una richiesta di validazione prompt - usa policy completa
+                policy = buildValidationPolicy();
+            }
+            
             ChatGptRequest request = new ChatGptRequest(policy, prompt);
 
             ChatGptResponse response = webClient.post()
@@ -76,7 +86,7 @@ public class ChatGptService {
         }
     }
 
-    private String buildPolicy() {
+    private String buildValidationPolicy() {
         return """
                 Sei un assistente virtuale la cui unica funzione è validare un prompt riguardante:
                 
