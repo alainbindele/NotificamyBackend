@@ -178,18 +178,38 @@ public class ChatGptService {
                  SOSTITUISCI {CRON_ESPRESSION} con l'espressione CRONTAB standard di linux che rappresenta il cron che potrebbe essere impostato per quella specifica richiesta (ovviamente se è rilevato CRON come true in "when_notify->type") altrimenti null
                  SOSTITUISCI {YYYY-MM-DD HH24:MI:SS} con il datetime in questo formato se rilevi SPECIFIC come true altrimenti null
                  SOSTITUISCI {YYYY-MM-DD HH24:MI:SS}" oppure null in start_time e/o end_time se richiesto che le notifiche abbiano un intervallo di validità specifico
-                 TIENI A MENTE QUESTE POSSIBILI CONFIGURAZIONI PER QUANTO RIGUARDA I FLAG TYPE:
-                 cron            date_specific         to_check        Description
-                  0                    	0                   0           NOT_VALID
-                  1 					0					0			Simply recurrent
-                  1 					1					0			NOT_VALID
-                  0 					1 					0			Simply in a certain date/datetime
-                  0                    	0                   1           Check if a condition is met (default:daily i.e SET CRON ONCE A DAY AT 8AM )
-                  1 					0					1			Check if a condition is met with a specified frequency
-                  1 					1					1			NOT_VALID
-                  0 					1 					1			Check if a condition is met in a certain date/datetime
-                I messaggi contrassegnati come "NOT_VALID" saranno invalidi per il fatto che non possono essere specifici e ricorrenti allo stesso tempo 
-                e non possono essere lasciati NON specificati tutti e 3 i campi type
+                 
+                 CONFIGURAZIONI VALIDE DEI FLAG TYPE (CASI ALGORITMO 0-5):
+                 
+                 CASO 0: cron=1, date_specific=0, to_check=1
+                 Esempio: "notificami se bitcoin scende sotto i 1000$"
+                 Descrizione: Controllo condizione senza tempo specifico (default: ogni giorno alle 10)
+                 
+                 CASO 1: cron=0, date_specific=1, to_check=0  
+                 Esempio: "notificami il 21 gennaio alle 9 sulle notizie"
+                 Descrizione: Notifica semplice a data/ora specifica
+                 
+                 CASO 2: cron=1, date_specific=0, to_check=0
+                 Esempio: "notificami ogni giorno alle 9 sulle notizie"
+                 Descrizione: Notifica ricorrente senza controllo condizioni
+                 
+                 CASO 3: cron=0, date_specific=1, to_check=1
+                 Esempio: "notificami il 21 gennaio alle 9 se bitcoin scende"
+                 Descrizione: Controllo condizione a data/ora specifica
+                 
+                 CASO 4: cron=1, date_specific=0, to_check=1
+                 Esempio: "notificami ogni giorno se bitcoin scende"
+                 Descrizione: Controllo condizione ricorrente
+                 
+                 CASO 5: cron=1, date_specific=1, to_check=1
+                 Esempio: "notificami il 21 gennaio se bitcoin scende, controlla ogni ora"
+                 Descrizione: Controllo condizione a data specifica con intervallo personalizzato
+                 
+                 CONFIGURAZIONI NON VALIDE:
+                 - cron=0, date_specific=0, to_check=0 (nessuna configurazione temporale)
+                 - Qualsiasi altra combinazione non elencata sopra
+                 
+                 IMPORTANTE: Il CASO 5 (cron=1, date_specific=1, to_check=1) è VALIDO e rappresenta il controllo di una condizione in una data specifica con un intervallo di controllo personalizzato.
                 """;
     }
 
