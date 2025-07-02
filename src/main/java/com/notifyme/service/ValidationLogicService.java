@@ -20,11 +20,14 @@ public class ValidationLogicService {
     @Autowired
     private CronExpressionService cronExpressionService;
     
+    @Autowired
+    private TemporalReferenceService temporalReferenceService;
+    
     /**
-     * Applica la logica di validazione usando SOLO i dati di ChatGPT
+     * Applica la logica di validazione e calcolo secondo l'algoritmo specificato
      */
     public TQuery applyValidationLogic(TUser user, String prompt, ChatGptValidationResponse validationResponse) {
-        logger.info("Applying validation logic for user: {} with ChatGPT response", user.getEmail());
+        logger.info("Applying validation logic for user: {} with prompt: {}", user.getEmail(), prompt);
         
         TQuery query = new TQuery(user, prompt);
         
@@ -33,21 +36,31 @@ public class ValidationLogicService {
         
         // 2. Se non è valido, ritorna subito
         if (!Boolean.TRUE.equals(query.getIsValid())) {
-            logger.info("Query marked as invalid by ChatGPT: {}", query.getInvalidReason());
+            logger.info("Query marked as invalid by ChatGPT, skipping further processing");
             return query;
         }
         
-        // 3. Estrai e applica i dati temporali dalla risposta ChatGPT
-        applyTemporalDataFromChatGPT(query, validationResponse);
+        // 3. Estrai riferimenti temporali dal prompt usando il servizio dedicato
+        TemporalReference temporalRef = temporalReferenceService.extractTemporalReference(prompt);
         
-        // 4. Applica la logica dei casi 0-5 basata sui flag ChatGPT
-        applyCaseLogicFromChatGPT(query, validationResponse);
+        // 4. Valida presenza di [qualcosa] o [evento]
+        if (!hasContentOrEvent(prompt)) {
+            logger.warn("Query rejected: no content or event specified");
+            query.setIsValid(false);
+            query.setInvalidReason("Manca la specifica di cosa notificare o quale evento controllare");
+            return query;
+        }
         
-        // 5. Valida la configurazione finale
-        validateFinalConfiguration(query);
+        // 5. Applica valutazione preliminare dell'intervallo di validità
+        if (!applyPreliminaryValidation(query, temporalRef)) {
+            return query; // Query chiusa o invalidata
+        }
         
-        logger.info("Validation logic applied - Query valid: {}, cron: {}, specific: {}, check: {}, next_execution: {}", 
-                   query.getIsValid(), query.getCron(), query.getDateSpecific(), query.getToCheck(), query.getNextExecution());
+        // 6. Classifica e applica la logica dei casi 0-5
+        applyCaseLogic(query, prompt, temporalRef, validationResponse);
+        
+        logger.info("Validation logic applied - Query valid: {}, cron: {}, specific: {}, check: {}", 
+                   query.getIsValid(), query.getCron(), query.getDateSpecific(), query.getToCheck());
         
         return query;
     }
@@ -87,151 +100,203 @@ public class ValidationLogicService {
             query.setModelVersion(response.getMetadata().getModelVersion());
             query.setConfidenceScore(response.getMetadata().getConfidenceScore());
             query.setPolicyEnforced(response.getMetadata().getPolicyEnforced());
-            
-            // Mappa tags
-            if (response.getMetadata().getTags() != null) {
-                try {
-                    String tagsJson = String.join(",", response.getMetadata().getTags());
-                    query.setTags("[\"" + String.join("\",\"", response.getMetadata().getTags()) + "\"]");
-                } catch (Exception e) {
-                    logger.warn("Failed to serialize tags: {}", e.getMessage());
-                }
-            }
         }
     }
     
     /**
-     * Estrae e applica i dati temporali dalla risposta ChatGPT
+     * Verifica se il prompt contiene [qualcosa] o [evento]
      */
-    private void applyTemporalDataFromChatGPT(TQuery query, ChatGptValidationResponse response) {
-        if (response.getWhenNotify() == null) {
-            logger.warn("No when_notify data in ChatGPT response");
-            return;
+    private boolean hasContentOrEvent(String prompt) {
+        // Il prompt deve contenere almeno una di queste cose:
+        // 1. Un'azione da ricordare (buttare la pasta, chiamare, etc.)
+        // 2. Un evento da controllare (se bitcoin scende, se arriva email, etc.)
+        // 3. Contenuto informativo (notizie, aggiornamenti, etc.)
+        
+        String lowerPrompt = prompt.toLowerCase();
+        
+        // Azioni/contenuti
+        if (lowerPrompt.contains("buttare") || lowerPrompt.contains("chiamare") || 
+            lowerPrompt.contains("ricorda") || lowerPrompt.contains("remind") ||
+            lowerPrompt.contains("notizie") || lowerPrompt.contains("news") ||
+            lowerPrompt.contains("aggiornament") || lowerPrompt.contains("update") ||
+            lowerPrompt.contains("promemoria") || lowerPrompt.contains("notifica")) {
+            return true;
         }
         
-        ChatGptValidationResponse.WhenNotify whenNotify = response.getWhenNotify();
-        
-        // Estrai i flag di tipo
-        if (whenNotify.getTimeType() != null) {
-            query.setCron(Boolean.TRUE.equals(whenNotify.getTimeType().getCron()));
-            query.setDateSpecific(Boolean.TRUE.equals(whenNotify.getTimeType().getSpecific()));
-            query.setToCheck(Boolean.TRUE.equals(whenNotify.getTimeType().getCheck()));
+        // Eventi condizionali
+        if (lowerPrompt.contains("se ") || lowerPrompt.contains("if ") ||
+            lowerPrompt.contains("quando ") || lowerPrompt.contains("when ") ||
+            lowerPrompt.contains("scende") || lowerPrompt.contains("sale") ||
+            lowerPrompt.contains("cambia") || lowerPrompt.contains("raggiunge")) {
+            return true;
         }
         
-        // Estrai cron expression
-        if (whenNotify.getCronExpression() != null && !whenNotify.getCronExpression().trim().isEmpty()) {
-            query.setCronParams(whenNotify.getCronExpression().trim());
-        }
+        return false;
+    }
+    
+    /**
+     * Applica la valutazione preliminare dell'intervallo di validità
+     */
+    private boolean applyPreliminaryValidation(TQuery query, TemporalReference temporalRef) {
+        LocalDateTime now = LocalDateTime.now();
         
-        // Estrai date/time specifiche
-        if (whenNotify.getDateTime() != null && !whenNotify.getDateTime().trim().isEmpty()) {
-            LocalDateTime specificDateTime = parseDateTime(whenNotify.getDateTime());
-            if (specificDateTime != null) {
-                query.setNextExecution(specificDateTime);
-            }
-        }
+        LocalDateTime validFrom = temporalRef.getValidFrom();
+        LocalDateTime validTo = temporalRef.getValidTo();
         
-        // Estrai periodo di validità
-        if (whenNotify.getStartDate() != null && !whenNotify.getStartDate().trim().isEmpty()) {
-            LocalDateTime validFrom = parseDateTime(whenNotify.getStartDate());
-            if (validFrom != null) {
+        // Caso: solo valid_from
+        if (validFrom != null && validTo == null) {
+            if (now.isBefore(validFrom)) {
                 query.setValidFrom(validFrom);
+                query.setNextExecution(validFrom);
+                logger.debug("Set next_execution to valid_from: {}", validFrom);
             }
         }
         
-        if (whenNotify.getEndDate() != null && !whenNotify.getEndDate().trim().isEmpty()) {
-            LocalDateTime validTo = parseDateTime(whenNotify.getEndDate());
-            if (validTo != null) {
+        // Caso: solo valid_to
+        else if (validFrom == null && validTo != null) {
+            if (now.isAfter(validTo)) {
+                query.setClosed(true);
                 query.setValidTo(validTo);
+                logger.info("Query closed: current time is after valid_to ({})", validTo);
+                return false;
+            }
+            query.setValidTo(validTo);
+        }
+        
+        // Caso: entrambi presenti
+        else if (validFrom != null && validTo != null) {
+            // 1. Controlla che l'intervallo sia almeno di 1 ora
+            if (validFrom.plusHours(1).isAfter(validTo)) {
+                query.setIsValid(false);
+                query.setInvalidReason("L'intervallo di validità deve essere di almeno 1 ora");
+                logger.warn("Invalid time interval: less than 1 hour between valid_from and valid_to");
+                return false;
+            }
+            
+            query.setValidFrom(validFrom);
+            query.setValidTo(validTo);
+            
+            // 2. Se ora è prima di valid_from
+            if (now.isBefore(validFrom)) {
+                query.setNextExecution(validFrom);
+                logger.debug("Set next_execution to valid_from: {}", validFrom);
+            }
+            
+            // 3. Se ora è dopo valid_to
+            else if (now.isAfter(validTo)) {
+                query.setClosed(true);
+                logger.info("Query closed: current time is after valid_to ({})", validTo);
+                return false;
             }
         }
         
-        logger.debug("Applied temporal data from ChatGPT - cron: {}, specific: {}, check: {}, next_execution: {}", 
-                    query.getCron(), query.getDateSpecific(), query.getToCheck(), query.getNextExecution());
+        return true; // Continua con la validazione
     }
     
     /**
-     * Applica la logica dei casi 0-5 basata sui flag ChatGPT
+     * Applica la logica dei casi 0-5 usando i flag di ChatGPT + parsing temporale
      */
-    private void applyCaseLogicFromChatGPT(TQuery query, ChatGptValidationResponse response) {
-        boolean cron = Boolean.TRUE.equals(query.getCron());
-        boolean specific = Boolean.TRUE.equals(query.getDateSpecific());
-        boolean check = Boolean.TRUE.equals(query.getToCheck());
+    private void applyCaseLogic(TQuery query, String prompt, TemporalReference temporalRef, ChatGptValidationResponse validationResponse) {
+        // Estrai i flag da ChatGPT
+        boolean chatGptCron = false;
+        boolean chatGptSpecific = false;
+        boolean chatGptCheck = false;
         
-        logger.debug("Applying case logic - cron: {}, specific: {}, check: {}", cron, specific, check);
+        if (validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getTimeType() != null) {
+            chatGptCron = Boolean.TRUE.equals(validationResponse.getWhenNotify().getTimeType().getCron());
+            chatGptSpecific = Boolean.TRUE.equals(validationResponse.getWhenNotify().getTimeType().getSpecific());
+            chatGptCheck = Boolean.TRUE.equals(validationResponse.getWhenNotify().getTimeType().getCheck());
+        }
         
-        // Calcola next_execution se non già impostato da ChatGPT
-        if (query.getNextExecution() == null) {
-            if (cron && query.getCronParams() != null) {
-                // Per query ricorrenti, calcola la prossima esecuzione dal cron
-                LocalDateTime nextExecution = cronExpressionService.getNextExecution(query.getCronParams());
+        // Combina con il parsing temporale locale per maggiore robustezza
+        boolean hasEvent = hasEventCondition(prompt);
+        boolean hasSpecificTime = temporalRef.hasSpecificDateTime();
+        boolean hasRecurringTime = temporalRef.hasRecurringPattern();
+        boolean hasCheckInterval = temporalRef.hasCheckInterval();
+        
+        logger.debug("ChatGPT flags - cron: {}, specific: {}, check: {}", chatGptCron, chatGptSpecific, chatGptCheck);
+        logger.debug("Local parsing - hasEvent: {}, hasSpecificTime: {}, hasRecurringTime: {}, hasCheckInterval: {}", 
+                    hasEvent, hasSpecificTime, hasRecurringTime, hasCheckInterval);
+        
+        // Usa i flag di ChatGPT come base, ma integra con il parsing locale
+        boolean finalCron = chatGptCron || hasRecurringTime || hasCheckInterval;
+        boolean finalSpecific = chatGptSpecific || hasSpecificTime;
+        boolean finalCheck = chatGptCheck || hasEvent;
+        
+        // Applica i flag finali
+        query.setCron(finalCron);
+        query.setDateSpecific(finalSpecific);
+        query.setToCheck(finalCheck);
+        
+        // Calcola next_execution e cron_params basandosi sui dati temporali estratti
+        calculateTemporalConfiguration(query, temporalRef, finalCron, finalSpecific, finalCheck);
+        
+        // Valida la configurazione finale
+        validateFinalConfiguration(query, finalCron, finalSpecific, finalCheck);
+    }
+    
+    /**
+     * Calcola la configurazione temporale (next_execution e cron_params)
+     */
+    private void calculateTemporalConfiguration(TQuery query, TemporalReference temporalRef, 
+                                              boolean cron, boolean specific, boolean check) {
+        
+        // 1. Se abbiamo una data/ora specifica, usala per next_execution
+        if (specific && temporalRef.hasSpecificDateTime()) {
+            query.setNextExecution(temporalRef.getSpecificDateTime());
+            logger.debug("Set next_execution from specific datetime: {}", temporalRef.getSpecificDateTime());
+        }
+        
+        // 2. Se abbiamo un pattern ricorrente, imposta cron_params
+        if (cron && temporalRef.hasRecurringPattern()) {
+            query.setCronParams(temporalRef.getCronExpression());
+            
+            // Se non abbiamo già next_execution, calcolalo dal cron
+            if (query.getNextExecution() == null) {
+                LocalDateTime nextExecution = cronExpressionService.getNextExecution(temporalRef.getCronExpression());
                 query.setNextExecution(nextExecution);
                 logger.debug("Calculated next_execution from cron: {}", nextExecution);
-            } else if (!cron && !specific) {
-                // Caso di fallback: imposta un'esecuzione di default
-                LocalDateTime defaultExecution = LocalDateTime.now().plusHours(1);
-                query.setNextExecution(defaultExecution);
-                logger.warn("No temporal configuration found, using default next_execution: {}", defaultExecution);
             }
         }
         
-        // Valida la configurazione dei casi
-        validateCaseConfiguration(query, cron, specific, check);
-    }
-    
-    /**
-     * Valida la configurazione dei casi 0-5
-     */
-    private void validateCaseConfiguration(TQuery query, boolean cron, boolean specific, boolean check) {
-        // Caso 0: cron=1, specific=0, check=1
-        if (cron && !specific && check) {
-            logger.debug("Validated as Case 0: recurring condition check");
-            return;
+        // 3. Se abbiamo un intervallo di controllo personalizzato, usalo
+        if (check && temporalRef.hasCheckInterval()) {
+            query.setCronParams(temporalRef.getCheckIntervalCron());
+            
+            if (query.getNextExecution() == null) {
+                LocalDateTime nextExecution = cronExpressionService.getNextExecution(temporalRef.getCheckIntervalCron());
+                query.setNextExecution(nextExecution);
+                logger.debug("Calculated next_execution from check interval: {}", nextExecution);
+            }
         }
         
-        // Caso 1: cron=0, specific=1, check=0
-        if (!cron && specific && !check) {
-            logger.debug("Validated as Case 1: specific time notification");
-            return;
+        // 4. Fallback per casi senza configurazione temporale esplicita
+        if (query.getNextExecution() == null && query.getCronParams() == null) {
+            if (check) {
+                // Per controlli senza orario specifico, usa default giornaliero alle 10:00
+                query.setCronParams("0 10 * * *");
+                query.setNextExecution(cronExpressionService.getNextExecution("0 10 * * *"));
+                logger.debug("Applied default check schedule: daily at 10:00");
+            } else {
+                // Per altri casi, usa un'esecuzione immediata
+                query.setNextExecution(LocalDateTime.now().plusMinutes(1));
+                logger.debug("Applied immediate execution fallback");
+            }
         }
-        
-        // Caso 2: cron=1, specific=0, check=0
-        if (cron && !specific && !check) {
-            logger.debug("Validated as Case 2: recurring notification");
-            return;
-        }
-        
-        // Caso 3: cron=0, specific=1, check=1
-        if (!cron && specific && check) {
-            logger.debug("Validated as Case 3: specific time condition check");
-            return;
-        }
-        
-        // Caso 4: cron=1, specific=0, check=1
-        if (cron && !specific && check) {
-            logger.debug("Validated as Case 4: recurring condition check");
-            return;
-        }
-        
-        // Caso 5: cron=1, specific=1, check=1
-        if (cron && specific && check) {
-            logger.debug("Validated as Case 5: specific time condition check with custom interval");
-            return;
-        }
-        
-        // Configurazione non valida
-        query.setIsValid(false);
-        query.setInvalidReason(String.format(
-            "Configurazione temporale non valida: cron=%s, specific=%s, check=%s", 
-            cron, specific, check
-        ));
-        logger.warn("Invalid case configuration: {}", query.getInvalidReason());
     }
     
     /**
      * Valida la configurazione finale
      */
-    private void validateFinalConfiguration(TQuery query) {
+    private void validateFinalConfiguration(TQuery query, boolean cron, boolean specific, boolean check) {
+        // Verifica configurazioni non valide secondo la tabella dei casi
+        if (!cron && !specific && !check) {
+            query.setIsValid(false);
+            query.setInvalidReason("Configurazione temporale non riconosciuta o non supportata");
+            logger.warn("Invalid configuration: no temporal flags set");
+            return;
+        }
+        
         // Verifica che ci sia almeno una configurazione temporale
         if (query.getNextExecution() == null && 
             (query.getCronParams() == null || query.getCronParams().trim().isEmpty())) {
@@ -242,7 +307,7 @@ public class ValidationLogicService {
         }
         
         // Verifica che next_execution non sia nel passato per query specifiche
-        if (Boolean.TRUE.equals(query.getDateSpecific()) && query.getNextExecution() != null) {
+        if (specific && query.getNextExecution() != null) {
             if (query.getNextExecution().isBefore(LocalDateTime.now())) {
                 query.setIsValid(false);
                 query.setInvalidReason("La data/ora specificata è nel passato");
@@ -251,61 +316,19 @@ public class ValidationLogicService {
             }
         }
         
-        // Verifica periodo di validità
-        if (query.getValidFrom() != null && query.getValidTo() != null) {
-            if (query.getValidFrom().isAfter(query.getValidTo())) {
-                query.setIsValid(false);
-                query.setInvalidReason("La data di inizio validità è dopo la data di fine");
-                logger.warn("Final validation failed: invalid validity period");
-                return;
-            }
-            
-            if (query.getValidFrom().plusHours(1).isAfter(query.getValidTo())) {
-                query.setIsValid(false);
-                query.setInvalidReason("Il periodo di validità deve essere di almeno 1 ora");
-                logger.warn("Final validation failed: validity period too short");
-                return;
-            }
-        }
-        
-        logger.debug("Final validation passed for query");
+        logger.debug("Final validation passed - cron: {}, specific: {}, check: {}, next_execution: {}, cron_params: {}", 
+                    cron, specific, check, query.getNextExecution(), query.getCronParams());
     }
     
     /**
-     * Parsa una stringa datetime in LocalDateTime
+     * Verifica se il prompt contiene una condizione di evento
      */
-    private LocalDateTime parseDateTime(String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) {
-            return null;
-        }
-        
-        try {
-            // Prova vari formati
-            DateTimeFormatter[] formatters = {
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
-                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
-                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"),
-                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"),
-                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-            };
-            
-            for (DateTimeFormatter formatter : formatters) {
-                try {
-                    LocalDateTime result = LocalDateTime.parse(dateTimeStr.trim(), formatter);
-                    logger.debug("Parsed datetime '{}' as {}", dateTimeStr, result);
-                    return result;
-                } catch (DateTimeParseException ignored) {
-                    // Prova il prossimo formato
-                }
-            }
-            
-            logger.warn("Failed to parse datetime: {}", dateTimeStr);
-            return null;
-            
-        } catch (Exception e) {
-            logger.error("Error parsing datetime '{}': {}", dateTimeStr, e.getMessage());
-            return null;
-        }
+    private boolean hasEventCondition(String prompt) {
+        String lowerPrompt = prompt.toLowerCase();
+        return lowerPrompt.contains("se ") || lowerPrompt.contains("if ") ||
+               lowerPrompt.contains("quando ") || lowerPrompt.contains("when ") ||
+               lowerPrompt.contains("scende") || lowerPrompt.contains("sale") ||
+               lowerPrompt.contains("cambia") || lowerPrompt.contains("raggiunge") ||
+               lowerPrompt.contains("supera") || lowerPrompt.contains("controllando");
     }
 }

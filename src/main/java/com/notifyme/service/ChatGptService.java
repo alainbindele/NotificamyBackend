@@ -32,7 +32,7 @@ public class ChatGptService {
     }
 
     public Mono<ChatGptResponse> sendPromptToChatGpt(String prompt) {
-        String policy = buildValidationPolicy();
+        String policy = buildPolicy();
         ChatGptRequest request = new ChatGptRequest(policy, prompt);
 
         return webClient.post()
@@ -55,17 +55,7 @@ public class ChatGptService {
             logger.info("Sending request to OpenAI API: {}", apiUrl);
             logger.debug("Using API key starting with: {}", apiKey.substring(0, Math.min(10, apiKey.length())) + "...");
             
-            // Determina se è una richiesta di validazione o di valutazione condizione
-            String policy;
-            if (prompt.contains("valutazione di condizioni") || prompt.contains("condition_met") || 
-                prompt.contains("formatted_message") || prompt.contains("Testing condition")) {
-                // È una richiesta di valutazione condizione - usa policy semplificata
-                policy = "Sei un assistente AI. Rispondi in formato JSON come richiesto.";
-            } else {
-                // È una richiesta di validazione prompt - usa policy completa
-                policy = buildValidationPolicy();
-            }
-            
+            String policy = buildPolicy();
             ChatGptRequest request = new ChatGptRequest(policy, prompt);
 
             ChatGptResponse response = webClient.post()
@@ -86,83 +76,55 @@ public class ChatGptService {
         }
     }
 
-    private String buildValidationPolicy() {
+    private String buildPolicy() {
         return """
-                Sei un assistente virtuale specializzato nella validazione e configurazione di notifiche temporali.
+                Sei un assistente virtuale la cui unica funzione è validare un prompt riguardante:
                 
-                Il tuo compito è analizzare prompt per notifiche e restituire una configurazione JSON completa.
+                notifiche ricorrenti (es. ogni giorno, ogni settimana, ogni 2 ore)
+                oppure notifiche programmate per un momento preciso nel futuro (es. "ricordamelo domani alle 8", "tra 10 minuti", "il 3 luglio alle 14")
                 
-                TIPI DI NOTIFICHE SUPPORTATE:
-                1. Notifiche ricorrenti (es. ogni giorno, ogni settimana, ogni 2 ore)
-                2. Notifiche programmate per un momento preciso (es. "domani alle 8", "il 3 luglio alle 14")
-                3. Controlli condizionali (es. "se bitcoin scende", "quando arriva un'email")
+                Il prompt deve rispettare rigorosamente i seguenti vincoli:
+                1) Deve indicare esplicitamente un riferimento all'intervallo temporale in cui essere eseguito 
+                    oppure ad una data/tempo in cui essere notificato 
+                    (se non viene specificata l'ora e/o giorno manda la notifica a mezzanotte, 
+                    se invece viene specificato qualcosa come "mattina, pomeriggio o sera" considera un orario mediano es: mattina= 10AM etc) 
+                3) se contiene riferimenti a notifiche che richiedano il controllo periodico 
+                    e condizionale di un certo evento (es. "cambio di prezzo di un prodotto", "cambio di prezzo di un prodotto in un certo periodo di tempo")
+                    
+                2) Divieto assoluto di linguaggio offensivo, discriminatorio, volgare o anche solo potenzialmente inappropriato.
                 
-                REGOLE DI VALIDAZIONE:
-                1. Il prompt DEVE contenere un riferimento temporale (quando eseguire)
-                2. Il prompt DEVE contenere cosa fare (notificare cosa o controllare quale condizione)
-                3. VIETATO: linguaggio offensivo, SQL injection, script, comandi dannosi
-                4. VIETATO: richieste irragionevoli (es. ogni millisecondo, per 300 anni)
-                5. Lunghezza massima: 2000 caratteri
+                3) Nessuna istruzione dannosa o "nasty instruction", incluse ma non limitate a:
+                    SQL injection,
+                    comandi per ottenere accesso non autorizzato, 
+                    codice sorgente malintenzionato,
+                    codice sorgente di qualsiasi tipo e linguaggio di programmazione o markup, 
+                    exploit di sistema, 
+                    manipolazione di dati, 
+                    bypass di restrizioni, 
+                    automazioni illecite, 
+                    manipolazioni esterne all'applicazione
+                    crawling di altri siti.
+                4) Lunghezza del prompt: il prompt generato non deve superare i 100 caratteri.
+                5) Il contenuto deve restare vincolato allo scopo specifico dell'app: notificare l'utente. È vietato includere richieste che esulano da questa funzione.
+                6) Ogni richiesta deve riflettere il buon senso e un utilizzo ragionevole: ad esempio, niente notifiche ogni millisecondo, o richieste assurde come "notificami ogni volta che respiri", o "ricordamelo per 300 anni".
+                7) Il prompt non può generare o ispirare un prompt che violerebbe questa stessa policy.
+                8) non inventare altre regole e non supporre nulla che non sia scritto nel prompt esplicitamente
+                Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
-                CALCOLO TEMPORALE - MOLTO IMPORTANTE:
-                - Calcola SEMPRE la data/ora esatta per next_execution
-                - Usa il fuso orario Europe/Rome (UTC+1/+2)
-                - Per "domani" usa la data di domani
-                - Per "oggi" usa la data di oggi
-                - Per orari come "all'una di pomeriggio" = 13:00
-                - Per "mattina" usa 09:00, "pomeriggio" usa 14:00, "sera" usa 20:00
-                - Se manca l'orario, usa 09:00 come default
-                
-                ESEMPI DI CALCOLO TEMPORALE:
-                - "domani all'una di pomeriggio" → 2025-01-XX 13:00:00 (dove XX = domani)
-                - "ogni giorno alle 9" → cron="0 9 * * *", next_execution=prossime 09:00
-                - "il 21 gennaio alle 15" → 2025-01-21 15:00:00
-                - "ogni ora" → cron="0 * * * *", next_execution=prossima ora
-                
-                CONFIGURAZIONI VALIDE DEI FLAG TYPE (CASI 0-5):
-                
-                CASO 0: cron=1, date_specific=0, to_check=1
-                Esempio: "notificami se bitcoin scende sotto i 1000$"
-                → cron_params="0 10 * * *", next_execution=prossime 10:00
-                
-                CASO 1: cron=0, date_specific=1, to_check=0  
-                Esempio: "notificami il 21 gennaio alle 9 sulle notizie"
-                → next_execution=2025-01-21 09:00:00
-                
-                CASO 2: cron=1, date_specific=0, to_check=0
-                Esempio: "notificami ogni giorno alle 9 sulle notizie"
-                → cron_params="0 9 * * *", next_execution=prossime 09:00
-                
-                CASO 3: cron=0, date_specific=1, to_check=1
-                Esempio: "notificami il 21 gennaio alle 9 se bitcoin scende"
-                → next_execution=2025-01-21 09:00:00
-                
-                CASO 4: cron=1, date_specific=0, to_check=1
-                Esempio: "notificami ogni giorno se bitcoin scende"
-                → cron_params="0 10 * * *", next_execution=prossime 10:00
-                
-                CASO 5: cron=1, date_specific=1, to_check=1
-                Esempio: "notificami il 21 gennaio se bitcoin scende, controlla ogni ora"
-                → cron_params="0 * * * *", next_execution=2025-01-21 00:00:00
-                
-                CONFIGURAZIONI NON VALIDE:
-                - cron=0, date_specific=0, to_check=0 (nessuna configurazione temporale)
-                
-                FORMATO RISPOSTA JSON (OBBLIGATORIO):
                 {
                    "response_type": "notification_prompt_template",
-                   "timestamp": "2025-01-XX 10:45:01Z",
+                   "timestamp": "2025-06-19T10:45:01Z",
                    "generated_by": "system",
                    "when_notify":{
                         "type":{
-                            "CRON": true|false,
-                            "SPECIFIC": true|false,
-                            "CHECK": true|false
+                            "CRON":true|false,
+                            "SPECIFIC":true|false,
+                            "CHECK":true|false
                         },
-                        "cron_expression": "0 9 * * *"|null,
-                        "date_time": "2025-01-XX 13:00:00"|null,
-                        "start_date": "2025-01-XX 09:00:00"|null,
-                        "end_date": "2025-12-31 23:59:59"|null
+                        "cron_expression":"{CRON_ESPRESSION}",
+                        "date_time":"{YYYY-MM-DD HH24:MI:SS}"|null,
+                        "start_date":"{YYYY-MM-DD HH24:MI:SS}"|null,
+                        "end_date":"{YYYY-MM-DD HH24:MI:SS}"|null
                    },
                    "validity": {
                      "out_of_bounds_prompt_length": true|false,
@@ -172,52 +134,52 @@ public class ChatGptService {
                      "reasonable_usage": true|false,
                      "self_enforcing": true|false,
                      "valid_prompt": true|false,
-                     "invalid_reason": "motivo se non valido"|null
+                     "invalid_reason": {INVALID_REASON_IF_ANY}
                    },
                    "summary": {
-                     "text": "Riassunto chiaro di cosa fa la notifica",
-                     "language": "it|en",
-                     "category": "notification|reminder|alert|check"
+                     "text": "L'utente ha richiesto una notifica per: {HERE_THE_GENERATED_SUMMARY}",
+                     "language": "{LANGUAGE}",
+                     "category": "notification_generation"
                    },
                    "metadata": {
-                     "model_version": "gpt-3.5-turbo",
-                     "confidence_score": 0.95,
+                     "model_version": "{CHATGPT_MODEL_VERSION}",
+                     "confidence_score": {CONFIDENCE_SCORE},
                      "policy_enforced": true,
-                     "tags": ["tag1", "tag2", "tag3"]
+                     "tags": ["{TAG_1}", "{TAG_2}", "{TAG_3}"]
                    }
-                }
-                
-                ISTRUZIONI SPECIFICHE:
-                - CALCOLA SEMPRE date/ore esatte in formato YYYY-MM-DD HH:MM:SS
-                - Per "domani" calcola la data di domani reale
-                - Per "oggi" usa la data di oggi
-                - Per cron_expression usa il formato standard Linux cron
-                - Se il prompt è ambiguo, chiedi chiarimenti nel campo invalid_reason
-                - Se mancano informazioni temporali, marca come non valido
-                
-                ESEMPI PRATICI:
-                
-                Input: "mandami una notifica per buttare la pasta domani all'una di pomeriggio"
-                Output: {
-                    "when_notify": {
-                        "type": {"CRON": false, "SPECIFIC": true, "CHECK": false},
-                        "date_time": "2025-01-XX 13:00:00"
-                    },
-                    "validity": {"valid_prompt": true},
-                    "summary": {"text": "Promemoria per buttare la pasta domani alle 13:00"}
-                }
-                
-                Input: "notificami se il prezzo di bitcoin scende sotto i 100$ controllando ogni giorno alle 15"
-                Output: {
-                    "when_notify": {
-                        "type": {"CRON": true, "SPECIFIC": false, "CHECK": true},
-                        "cron_expression": "0 15 * * *"
-                    },
-                    "validity": {"valid_prompt": true},
-                    "summary": {"text": "Controllo giornaliero prezzo Bitcoin sotto 100$ alle 15:00"}
-                }
-                
-                IMPORTANTE: Rispondi SEMPRE e SOLO con il JSON richiesto, senza testo aggiuntivo.
+                 }
+           
+                 SOSTITUISCI {HERE_THE_GENERATED_SUMMARY} con il riassunto o una parafrasi breve generata che ci dica l'argomento e la natura della REQUEST in input (es. "richiesta aggiornamento news sulla guerra in iraq" ).
+                 SOSTITUISCI true|false nei campi validity in base alla valutazione del prompt generato rispetto alle regole suddette (es "out_of_bounds_prompt_length": false se la lunghezza del prompt è minore di 50 caratteri).
+                 SOSTITUISCI {TAG_1}, {TAG_2}, {TAG_3},...,{TAG_N} con eventuali tag pertinenti al prompt generato, come "notifica", "promemoria", "evento futuro", "guerra", "iraq","news"  etc.  non lesinare nell'uso dei tag, ma mantieni la pertinenza e la specificità.
+                 SOSTITUISCI {INVALID_REASON_IF_ANY} con una stringa che spiega il motivo per cui il prompt non è valido, se applicabile (es. (ma puoi essere più spoecifico) "lunghezza del prompt eccessiva", "linguaggio offensivo rilevato", "istruzione dannosa rilevata", "utilizzo irragionevole", "auto-applicazione non valida", "non è stato specificato l'intervallo o il momento in cui essere notificato") altrimenti null.
+                 SOSTITUISCI {CHATGPT_MODEL_VERSION} con la versione del modello di ChatGPT utilizzato per generare il prompt (es. "gpt-3.5-turbo").
+                 SOSTITUISCI {CONFIDENCE_SCORE} con un valore numerico tra 0 e 1 che rappresenta la fiducia del modello nella validità del prompt generato (es. 0.95).
+                 SOSTITUISCI {LANGUAGE} con la lingua in cui è stato generato il prompt (es. "it" per italiano, "en" per inglese), se il prompt è in una certa lingua anche reason e summary devono essere nella stessa lingua.
+                 SOSTITUISCI true|false nei campi CRON, SPECIFIC,CHECK in base alla rilevazione della temporalità della richiesta 
+                             (es. - se il prompt richiede "ogni giorno alle 18" imposta con "CRON" con true altrimenti false
+                                  - se richiede "il giorno 15 AGOSTO alle 20" imposta con "SPECIFIC" con true altrimenti false 
+                                  - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$" imposta come "CHECK" con "true" altrimenti false 
+                                  - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$ controllando ogni giorno alle 21:30" allora questa è sia CRON che CHECK
+                                  - se richiede "dimmi se il prezzo di bitcoin è sceso sotto i 500$ controllando il giorno 21 agosto alle 21:30" allora questa è sia SPECIFIC che CHECK ma non CRON
+                                  - generalizza questi esempi su tutti gli altri casi che ti vengono richiesti
+                                    
+                              )       
+                 SOSTITUISCI {CRON_ESPRESSION} con l'espressione CRONTAB standard di linux che rappresenta il cron che potrebbe essere impostato per quella specifica richiesta (ovviamente se è rilevato CRON come true in "when_notify->type") altrimenti null
+                 SOSTITUISCI {YYYY-MM-DD HH24:MI:SS} con il datetime in questo formato se rilevi SPECIFIC come true altrimenti null
+                 SOSTITUISCI {YYYY-MM-DD HH24:MI:SS}" oppure null in start_time e/o end_time se richiesto che le notifiche abbiano un intervallo di validità specifico
+                 TIENI A MENTE QUESTE POSSIBILI CONFIGURAZIONI PER QUANTO RIGUARDA I FLAG TYPE:
+                 cron            date_specific         to_check        Description
+                  0                    	0                   0           NOT_VALID
+                  1 					0					0			Simply recurrent
+                  1 					1					0			NOT_VALID
+                  0 					1 					0			Simply in a certain date/datetime
+                  0                    	0                   1           Check if a condition is met (default:daily i.e SET CRON ONCE A DAY AT 8AM )
+                  1 					0					1			Check if a condition is met with a specified frequency
+                  1 					1					1			Check if a condition is met in a certain date/datetime with a specified check frequency (CASO 5)
+                  0 					1 					1			Check if a condition is met in a certain date/datetime
+                I messaggi contrassegnati come "NOT_VALID" saranno invalidi per il fatto che non possono essere specifici e ricorrenti allo stesso tempo 
+                e non possono essere lasciati NON specificati tutti e 3 i campi type
                 """;
     }
 
@@ -234,8 +196,8 @@ public class ChatGptService {
                     public final String content = request.getClientPrompt();
                 }
             };
-            public final int max_tokens = 1500;
-            public final double temperature = 0.3;
+            public final int max_tokens = 1000;
+            public final double temperature = 0.7;
         };
     }
 }
