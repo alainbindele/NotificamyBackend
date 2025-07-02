@@ -12,8 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 
 @Service
@@ -26,113 +24,34 @@ public class QueryService {
     private QueryRepository queryRepository;
     
     @Autowired
+    private ValidationLogicService validationLogicService;
+    
+    @Autowired
     private ObjectMapper objectMapper;
     
+    /**
+     * Crea una query applicando la logica di validazione completa
+     */
     public TQuery createQuery(TUser user, String prompt, ChatGptValidationResponse validationResponse) {
-        TQuery query = new TQuery(user, prompt);
+        logger.info("Creating query for user: {} with validation logic", user.getEmail());
         
-        // Map validation response to query entity
-        mapValidationResponseToQuery(query, validationResponse);
+        // Applica la logica di validazione e calcolo
+        TQuery query = validationLogicService.applyValidationLogic(user, prompt, validationResponse);
         
+        // Salva nel database
         TQuery savedQuery = queryRepository.save(query);
-        logger.info("Created new query with ID: {} for user: {} (valid: {})", 
-                   savedQuery.getId(), user.getEmail(), savedQuery.getIsValid());
+        
+        logger.info("Created query with ID: {} for user: {} - valid: {}, cron: {}, specific: {}, check: {}, next_execution: {}", 
+                   savedQuery.getId(), user.getEmail(), savedQuery.getIsValid(), 
+                   savedQuery.getCron(), savedQuery.getDateSpecific(), savedQuery.getToCheck(),
+                   savedQuery.getNextExecution());
         
         return savedQuery;
     }
     
-    private void mapValidationResponseToQuery(TQuery query, ChatGptValidationResponse response) {
-        if (response == null) {
-            query.setIsValid(false);
-            return;
-        }
-        
-        // Map validity fields
-        if (response.getValidity() != null) {
-            ChatGptValidationResponse.Validity validity = response.getValidity();
-            
-            query.setIsValid(Boolean.TRUE.equals(validity.getValidPrompt()));
-            query.setOutOfBoundsPromptLength(validity.getOutOfBoundsPromptLength());
-            query.setOffensiveLanguageDetected(validity.getOffensiveLanguageDetected());
-            query.setNastyInstructionDetected(validity.getNastyInstructionDetected());
-            query.setPurposeValid(validity.getPurposeValid());
-            query.setReasonableUsage(validity.getReasonableUsage());
-            query.setSelfEnforcing(validity.getSelfEnforcing());
-            query.setInvalidReason(validity.getInvalidReason());
-        }
-        
-        // Map when_notify fields
-        if (response.getWhenNotify() != null) {
-            ChatGptValidationResponse.WhenNotify whenNotify = response.getWhenNotify();
-            
-            // Map type flags
-            if (whenNotify.getTimeType() != null) {
-                query.setCron(Boolean.TRUE.equals(whenNotify.getTimeType().getCron()));
-                query.setDateSpecific(Boolean.TRUE.equals(whenNotify.getTimeType().getSpecific()));
-                query.setToCheck(Boolean.TRUE.equals(whenNotify.getTimeType().getCheck()));
-            }
-            
-            // Map cron expression
-            if (whenNotify.getCronExpression() != null && !whenNotify.getCronExpression().trim().isEmpty()) {
-                query.setCronParams(whenNotify.getCronExpression().trim());
-                query.setNextExecution(calculateNextCronExecution(whenNotify.getCronExpression()));
-            }
-
-            // Map validity period
-            if (whenNotify.getStartDate() != null && !whenNotify.getStartDate().trim().isEmpty()) {
-                try {
-                    LocalDateTime startDate = LocalDateTime.parse(
-                        whenNotify.getStartDate().trim(), 
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    );
-                    query.setValidFrom(startDate);
-                } catch (DateTimeParseException e) {
-                    logger.warn("Failed to parse start date: {}", whenNotify.getStartDate(), e);
-                }
-            }
-            
-            if (whenNotify.getEndDate() != null && !whenNotify.getEndDate().trim().isEmpty()) {
-                try {
-                    LocalDateTime endDate = LocalDateTime.parse(
-                        whenNotify.getEndDate().trim(), 
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    );
-                    query.setValidTo(endDate);
-                } catch (DateTimeParseException e) {
-                    logger.warn("Failed to parse end date: {}", whenNotify.getEndDate(), e);
-                }
-            }
-        }
-        
-        // Map summary fields
-        if (response.getSummary() != null) {
-            ChatGptValidationResponse.Summary summary = response.getSummary();
-            query.setSummaryText(summary.getText());
-            query.setLanguage(summary.getLanguage());
-            query.setCategory(summary.getCategory());
-        }
-        
-        // Map metadata fields
-        if (response.getMetadata() != null) {
-            ChatGptValidationResponse.Metadata metadata = response.getMetadata();
-            query.setModelVersion(metadata.getModelVersion());
-            query.setConfidenceScore(metadata.getConfidenceScore());
-            query.setPolicyEnforced(metadata.getPolicyEnforced());
-            
-            // Convert tags array to JSON string
-            if (metadata.getTags() != null && metadata.getTags().length > 0) {
-                try {
-                    query.setTags(objectMapper.writeValueAsString(metadata.getTags()));
-                } catch (Exception e) {
-                    logger.warn("Failed to serialize tags: {}", e.getMessage());
-                }
-            }
-        }
-        
-        logger.info("Mapped ChatGPT validation response to query: cron={}, specific={}, check={}, valid={}", 
-                   query.getCron(), query.getDateSpecific(), query.getToCheck(), query.getIsValid());
-    }
-    
+    /**
+     * Crea una query di fallback quando il parsing della risposta ChatGPT fallisce
+     */
     public TQuery createFallbackQuery(TUser user, String prompt) {
         TQuery query = new TQuery(user, prompt);
         query.setIsValid(false);
@@ -145,29 +64,113 @@ public class QueryService {
         return savedQuery;
     }
     
+    /**
+     * Trova query per utente ordinate per data di creazione
+     */
     public List<TQuery> findByUser(TUser user) {
         return queryRepository.findByUserOrderByCreatedAtDesc(user);
     }
     
+    /**
+     * Trova solo query valide per utente
+     */
     public List<TQuery> findValidQueriesByUser(TUser user) {
         return queryRepository.findByUserAndIsValid(user, true);
     }
     
-    public List<TQuery> findQueriesReadyForExecution() {
-        return queryRepository.findByIsValidAndNextExecutionBefore(true, LocalDateTime.now());
+    /**
+     * Trova query attive (valide e non chiuse) per utente
+     */
+    public List<TQuery> findActiveQueriesByUser(TUser user) {
+        return queryRepository.findActiveQueriesByUser(user);
     }
     
-    private LocalDateTime calculateNextCronExecution(String cronExpression) {
-        // Implementazione semplificata per calcolare la prossima esecuzione
-        // In un'implementazione reale, useresti una libreria come Quartz o Spring Scheduler
+    /**
+     * Trova query pronte per l'esecuzione (per Spring Batch)
+     */
+    public List<TQuery> findQueriesReadyForExecution() {
+        return queryRepository.findQueriesReadyForExecutionWithValidityPeriod(LocalDateTime.now());
+    }
+    
+    /**
+     * Trova query per tipo
+     */
+    public List<TQuery> findCronQueriesByUser(TUser user) {
+        return queryRepository.findByUserAndCronTrue(user);
+    }
+    
+    public List<TQuery> findSpecificQueriesByUser(TUser user) {
+        return queryRepository.findByUserAndDateSpecificTrue(user);
+    }
+    
+    public List<TQuery> findCheckQueriesByUser(TUser user) {
+        return queryRepository.findByUserAndToCheckTrue(user);
+    }
+    
+    /**
+     * Statistiche per utente
+     */
+    public QueryStatistics getQueryStatistics(TUser user) {
+        QueryStatistics stats = new QueryStatistics();
+        stats.setTotalQueries(queryRepository.countValidQueriesByUser(user));
+        stats.setCronQueries(queryRepository.countCronQueriesByUser(user));
+        stats.setSpecificQueries(queryRepository.countSpecificQueriesByUser(user));
+        stats.setCheckQueries(queryRepository.countCheckQueriesByUser(user));
         
+        return stats;
+    }
+    
+    /**
+     * Chiude una query manualmente
+     */
+    public boolean closeQuery(Long queryId, TUser user) {
         try {
-            // Per ora, aggiungiamo semplicemente 1 ora come esempio
-            // Dovresti implementare un parser cron completo qui
-            return LocalDateTime.now().plusHours(1);
+            TQuery query = queryRepository.findById(queryId).orElse(null);
+            
+            if (query == null) {
+                logger.warn("Query not found: {}", queryId);
+                return false;
+            }
+            
+            if (!query.getUser().getId().equals(user.getId())) {
+                logger.warn("User {} attempted to close query {} owned by {}", 
+                           user.getEmail(), queryId, query.getUser().getEmail());
+                return false;
+            }
+            
+            query.setClosed(true);
+            query.setNextExecution(null);
+            queryRepository.save(query);
+            
+            logger.info("Query {} closed by user {}", queryId, user.getEmail());
+            return true;
+            
         } catch (Exception e) {
-            logger.warn("Failed to calculate next cron execution for: {}", cronExpression, e);
-            return LocalDateTime.now().plusHours(1); // Fallback
+            logger.error("Error closing query {}: {}", queryId, e.getMessage(), e);
+            return false;
         }
+    }
+    
+    /**
+     * Classe per le statistiche delle query
+     */
+    public static class QueryStatistics {
+        private Long totalQueries = 0L;
+        private Long cronQueries = 0L;
+        private Long specificQueries = 0L;
+        private Long checkQueries = 0L;
+        
+        // Getters e setters
+        public Long getTotalQueries() { return totalQueries; }
+        public void setTotalQueries(Long totalQueries) { this.totalQueries = totalQueries; }
+        
+        public Long getCronQueries() { return cronQueries; }
+        public void setCronQueries(Long cronQueries) { this.cronQueries = cronQueries; }
+        
+        public Long getSpecificQueries() { return specificQueries; }
+        public void setSpecificQueries(Long specificQueries) { this.specificQueries = specificQueries; }
+        
+        public Long getCheckQueries() { return checkQueries; }
+        public void setCheckQueries(Long checkQueries) { this.checkQueries = checkQueries; }
     }
 }
