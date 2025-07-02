@@ -24,6 +24,9 @@ public class ChatGptService {
     
     @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
     private String apiUrl;
+    
+    @Value("${openai.model:gpt-4o}")
+    private String model;
 
     public ChatGptService() {
         this.webClient = WebClient.builder()
@@ -52,7 +55,7 @@ public class ChatGptService {
                 throw new RuntimeException("OpenAI API key is not configured. Please set OPENAI_API_KEY environment variable.");
             }
             
-            logger.info("Sending request to OpenAI API: {}", apiUrl);
+            logger.info("Sending request to OpenAI API: {} using model: {}", apiUrl, model);
             logger.debug("Using API key starting with: {}", apiKey.substring(0, Math.min(10, apiKey.length())) + "...");
             
             String policy = buildPolicy();
@@ -64,14 +67,14 @@ public class ChatGptService {
                     .bodyValue(buildOpenAiRequest(request))
                     .retrieve()
                     .bodyToMono(ChatGptResponse.class)
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(60)) // Aumentato timeout per GPT-4o
                     .block();
                     
-            logger.info("Successfully received response from OpenAI API");
+            logger.info("Successfully received response from OpenAI API using {}", model);
             return response;
             
         } catch (Exception e) {
-            logger.error("Failed to get response from ChatGPT: {}", e.getMessage(), e);
+            logger.error("Failed to get response from ChatGPT ({}): {}", model, e.getMessage(), e);
             throw new RuntimeException("Failed to get response from ChatGPT: " + e.getMessage(), e);
         }
     }
@@ -201,7 +204,7 @@ public class ChatGptService {
                  SOSTITUISCI true|false nei campi validity in base alla valutazione del prompt generato rispetto alle regole suddette (es "out_of_bounds_prompt_length": false se la lunghezza del prompt è minore di 50 caratteri).
                  SOSTITUISCI {TAG_1}, {TAG_2}, {TAG_3},...,{TAG_N} con eventuali tag pertinenti al prompt generato, come "notifica", "promemoria", "evento futuro", "guerra", "iraq","news"  etc.  non lesinare nell'uso dei tag, ma mantieni la pertinenza e la specificità.
                  SOSTITUISCI {INVALID_REASON_IF_ANY} con una stringa che spiega il motivo per cui il prompt non è valido, se applicabile (es. (ma puoi essere più spoecifico) "lunghezza del prompt eccessiva", "linguaggio offensivo rilevato", "istruzione dannosa rilevata", "utilizzo irragionevole", "auto-applicazione non valida", "non è stato specificato l'intervallo o il momento in cui essere notificato") altrimenti null.
-                 SOSTITUISCI {CHATGPT_MODEL_VERSION} con la versione del modello di ChatGPT utilizzato per generare il prompt (es. "gpt-3.5-turbo").
+                 SOSTITUISCI {CHATGPT_MODEL_VERSION} con la versione del modello di ChatGPT utilizzato per generare il prompt (es. "gpt-4o").
                  SOSTITUISCI {CONFIDENCE_SCORE} con un valore numerico tra 0 e 1 che rappresenta la fiducia del modello nella validità del prompt generato (es. 0.95).
                  SOSTITUISCI {LANGUAGE} con la lingua in cui è stato generato il prompt (es. "it" per italiano, "en" per inglese), se il prompt è in una certa lingua anche reason e summary devono essere nella stessa lingua.
                  SOSTITUISCI true|false nei campi CRON, SPECIFIC,CHECK in base alla rilevazione della temporalità della richiesta 
@@ -234,7 +237,7 @@ public class ChatGptService {
 
     private Object buildOpenAiRequest(ChatGptRequest request) {
         return new Object() {
-            public final String model = "gpt-3.5-turbo";
+            public final String model = ChatGptService.this.model; // Usa il modello configurabile
             public final Object[] messages = {
                 new Object() {
                     public final String role = "system";
@@ -245,8 +248,9 @@ public class ChatGptService {
                     public final String content = request.getClientPrompt();
                 }
             };
-            public final int max_tokens = 1000;
-            public final double temperature = 0.7;
+            public final int max_tokens = 1500; // Aumentato per GPT-4o
+            public final double temperature = 0.3; // Ridotto per maggiore precisione
+            public final double top_p = 0.9; // Aggiunto per migliore qualità
         };
     }
 }

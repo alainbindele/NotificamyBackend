@@ -46,11 +46,12 @@ auth0:
   domain: ${AUTH0_DOMAIN}
   audience: ${AUTH0_AUDIENCE}
 
-# OpenAI Configuration - CRITICAL: Remove default empty value
+# OpenAI Configuration - AGGIORNATO per GPT-4o
 openai:
   api:
     key: ${OPENAI_API_KEY}
     url: https://api.openai.com/v1/chat/completions
+  model: ${OPENAI_MODEL:gpt-4o} # Configurabile tramite variabile d'ambiente
 
 # Logging
 logging:
