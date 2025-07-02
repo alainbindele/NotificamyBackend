@@ -45,7 +45,7 @@ public class ValidationLogicService {
         // 3. Estrai riferimenti temporali dal prompt
         TemporalReference temporalRef = temporalReferenceService.extractTemporalReference(prompt);
         
-        // 4. Valida presenza di [qualcosa] o [evento]
+        // 4. MIGLIORATO: Valida presenza di [qualcosa] o [evento] con pattern più ampi
         if (!hasContentOrEvent(prompt)) {
             logger.warn("Query rejected: no content or event specified");
             query.setIsValid(false);
@@ -106,16 +106,35 @@ public class ValidationLogicService {
     }
     
     /**
-     * Verifica se il prompt contiene [qualcosa] o [evento]
+     * MIGLIORATO: Verifica se il prompt contiene [qualcosa] o [evento] con pattern più ampi
      */
     private boolean hasContentOrEvent(String prompt) {
         // Pattern per rilevare eventi condizionali
-        Pattern eventPattern = Pattern.compile("(?i)\\bse\\b|\\bif\\b|\\bwhen\\b|\\bquando\\b|\\bscende\\b|\\bsale\\b|\\bcambia\\b|\\braggiunge\\b");
+        Pattern eventPattern = Pattern.compile("(?i)\\bse\\b|\\bif\\b|\\bwhen\\b|\\bquando\\b|\\bscende\\b|\\bsale\\b|\\bcambia\\b|\\braggiunge\\b|\\bsupera\\b|\\braggiunge\\b");
         
         // Pattern per rilevare contenuti informativi
         Pattern contentPattern = Pattern.compile("(?i)\\bnotizie\\b|\\bnews\\b|\\baggiornament\\b|\\bupdate\\b|\\binfo\\b|\\bpromemoria\\b|\\bricorda\\b|\\bremind\\b");
         
-        return eventPattern.matcher(prompt).find() || contentPattern.matcher(prompt).find();
+        // NUOVO: Pattern per rilevare azioni/attività specifiche
+        Pattern actionPattern = Pattern.compile("(?i)\\b(per|to|di)\\s+(\\w+)\\b");
+        
+        // NUOVO: Pattern per rilevare oggetti/sostantivi che indicano cosa fare
+        Pattern objectPattern = Pattern.compile("(?i)\\b(buttare|cucinare|preparare|fare|comprare|chiamare|incontrare|andare|partire|finire|iniziare|completare|inviare|scrivere|leggere|studiare|lavorare|mangiare|bere|dormire|svegliare|alzare|vestire|lavare|pulire|pagare|prenotare|cancellare|confermare)\\b");
+        
+        // NUOVO: Pattern per rilevare riferimenti temporali che implicano un'azione
+        Pattern temporalActionPattern = Pattern.compile("(?i)\\b(domani|oggi|stasera|stamattina|pomeriggio|sera|mattina)\\b.*\\b(per|di|alle|al)\\b");
+        
+        boolean hasEvent = eventPattern.matcher(prompt).find();
+        boolean hasContent = contentPattern.matcher(prompt).find();
+        boolean hasAction = actionPattern.matcher(prompt).find();
+        boolean hasObject = objectPattern.matcher(prompt).find();
+        boolean hasTemporalAction = temporalActionPattern.matcher(prompt).find();
+        
+        logger.debug("Content/Event analysis - hasEvent: {}, hasContent: {}, hasAction: {}, hasObject: {}, hasTemporalAction: {}", 
+                    hasEvent, hasContent, hasAction, hasObject, hasTemporalAction);
+        
+        // Se ha almeno uno di questi pattern, è valido
+        return hasEvent || hasContent || hasAction || hasObject || hasTemporalAction;
     }
     
     /**

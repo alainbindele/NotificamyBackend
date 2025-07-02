@@ -127,6 +127,17 @@ public class PromptController {
                         }
                         
                         logger.info("Query saved successfully for user: {} with full ChatGPT validation data", userId);
+                        
+                        // MIGLIORAMENTO: Se la query non è valida, restituisci errore al frontend
+                        if (!Boolean.TRUE.equals(savedQuery.getIsValid())) {
+                            String errorMessage = savedQuery.getInvalidReason() != null ? 
+                                                 savedQuery.getInvalidReason() : 
+                                                 "Il prompt non è valido secondo le policy di sistema";
+                            
+                            logger.warn("Query marked as invalid for user {}: {}", userId, errorMessage);
+                            return ResponseEntity.badRequest()
+                                    .body(ApiResponse.error(errorMessage));
+                        }
                     }
                     
                     // Log validation results for monitoring
@@ -149,8 +160,12 @@ public class PromptController {
                     
                     // Save query anyway, but mark as invalid due to parsing error
                     if (user != null) {
-                        queryService.createFallbackQuery(user, sanitizedPrompt);
+                        var fallbackQuery = queryService.createFallbackQuery(user, sanitizedPrompt);
                         logger.info("Fallback query saved for user: {}", userId);
+                        
+                        // Restituisci errore al frontend anche per fallback query
+                        return ResponseEntity.badRequest()
+                                .body(ApiResponse.error("Errore nell'elaborazione del prompt. Riprova con una formulazione diversa."));
                     }
                 }
                 

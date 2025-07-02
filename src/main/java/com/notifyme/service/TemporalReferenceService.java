@@ -16,14 +16,14 @@ public class TemporalReferenceService {
     
     private static final Logger logger = LoggerFactory.getLogger(TemporalReferenceService.class);
     
-    // Pattern per date specifiche
+    // MIGLIORATO: Pattern per date specifiche con "domani", "oggi", etc.
     private static final Pattern SPECIFIC_DATE_PATTERN = Pattern.compile(
-        "(?i)\\b(il|on)\\s+(\\d{1,2})\\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|january|february|march|april|may|june|july|august|september|october|november|december)(?:\\s+(\\d{4}))?(?:\\s+alle?\\s+(\\d{1,2})(?::(\\d{2}))?)?\\b"
+        "(?i)\\b(il|on|domani|oggi|stasera|stamattina|tomorrow|today)\\s*(?:(\\d{1,2})\\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|january|february|march|april|may|june|july|august|september|october|november|december)(?:\\s+(\\d{4}))?)?(?:\\s+alle?\\s+(\\d{1,2})(?::(\\d{2}))?(?:\\s*(di\\s+)?(mattina|pomeriggio|sera|am|pm))?)?\\b"
     );
     
     // Pattern per orari specifici
     private static final Pattern SPECIFIC_TIME_PATTERN = Pattern.compile(
-        "(?i)\\b(alle?|at)\\s+(\\d{1,2})(?::(\\d{2}))?(?:\\s*(am|pm|mattina|pomeriggio|sera))?\\b"
+        "(?i)\\b(alle?|at)\\s+(\\d{1,2})(?::(\\d{2}))?(?:\\s*(di\\s+)?(am|pm|mattina|pomeriggio|sera))?\\b"
     );
     
     // Pattern per intervalli ricorrenti - MIGLIORATO per catturare "controllando ogni X"
@@ -66,7 +66,7 @@ public class TemporalReferenceService {
     }
     
     /**
-     * Estrae data e ora specifiche
+     * MIGLIORATO: Estrae data e ora specifiche con supporto per "domani", "oggi", etc.
      */
     private void extractSpecificDateTime(String prompt, TemporalReference reference) {
         Matcher dateMatcher = SPECIFIC_DATE_PATTERN.matcher(prompt);
@@ -76,20 +76,70 @@ public class TemporalReferenceService {
         
         if (dateMatcher.find()) {
             try {
-                int day = Integer.parseInt(dateMatcher.group(2));
+                String dateIndicator = dateMatcher.group(1).toLowerCase(); // "domani", "oggi", "il", etc.
+                String dayStr = dateMatcher.group(2);
                 String monthStr = dateMatcher.group(3);
                 String yearStr = dateMatcher.group(4);
                 String hourStr = dateMatcher.group(5);
                 String minuteStr = dateMatcher.group(6);
+                String periodStr = dateMatcher.group(8); // "mattina", "pomeriggio", "sera"
                 
-                int month = parseMonth(monthStr);
-                int year = yearStr != null ? Integer.parseInt(yearStr) : LocalDateTime.now().getYear();
-                int hour = hourStr != null ? Integer.parseInt(hourStr) : 0;
-                int minute = minuteStr != null ? Integer.parseInt(minuteStr) : 0;
+                LocalDateTime baseDate = LocalDateTime.now();
                 
-                specificDateTime = LocalDateTime.of(year, month, day, hour, minute);
+                // Gestisci indicatori di data relativi
+                if ("domani".equals(dateIndicator) || "tomorrow".equals(dateIndicator)) {
+                    baseDate = baseDate.plusDays(1);
+                } else if ("oggi".equals(dateIndicator) || "today".equals(dateIndicator)) {
+                    // Mantieni la data di oggi
+                } else if ("stasera".equals(dateIndicator)) {
+                    // Stasera = oggi alle 20:00 di default
+                    baseDate = baseDate.withHour(20).withMinute(0);
+                } else if ("stamattina".equals(dateIndicator)) {
+                    // Stamattina = oggi alle 9:00 di default
+                    baseDate = baseDate.withHour(9).withMinute(0);
+                }
                 
-                logger.debug("Extracted specific date from pattern: {}", specificDateTime);
+                // Se c'è una data specifica (giorno/mese/anno)
+                if (dayStr != null && monthStr != null) {
+                    int day = Integer.parseInt(dayStr);
+                    int month = parseMonth(monthStr);
+                    int year = yearStr != null ? Integer.parseInt(yearStr) : baseDate.getYear();
+                    baseDate = LocalDateTime.of(year, month, day, baseDate.getHour(), baseDate.getMinute());
+                }
+                
+                // Gestisci l'orario
+                if (hourStr != null) {
+                    int hour = Integer.parseInt(hourStr);
+                    int minute = minuteStr != null ? Integer.parseInt(minuteStr) : 0;
+                    
+                    // Gestisci periodo del giorno
+                    if (periodStr != null) {
+                        periodStr = periodStr.toLowerCase().replace("di ", "");
+                        if (periodStr.contains("pomeriggio") && hour <= 12) {
+                            hour += 12;
+                        } else if (periodStr.contains("sera") && hour <= 12) {
+                            hour += 12;
+                        } else if (periodStr.contains("pm") && hour < 12) {
+                            hour += 12;
+                        } else if (periodStr.contains("am") && hour == 12) {
+                            hour = 0;
+                        }
+                    }
+                    
+                    specificDateTime = baseDate.withHour(hour).withMinute(minute).withSecond(0).withNano(0);
+                } else {
+                    // Se non c'è orario specificato, usa quello di base
+                    specificDateTime = baseDate.withSecond(0).withNano(0);
+                }
+                
+                // Se la data/ora è nel passato, spostala al giorno successivo (solo per orari senza data specifica)
+                if (specificDateTime.isBefore(LocalDateTime.now()) && 
+                    ("oggi".equals(dateIndicator) || "today".equals(dateIndicator) || 
+                     (!dateIndicator.equals("domani") && !dateIndicator.equals("tomorrow") && dayStr == null))) {
+                    specificDateTime = specificDateTime.plusDays(1);
+                }
+                
+                logger.debug("Extracted specific date from pattern '{}': {}", dateMatcher.group(), specificDateTime);
                 
             } catch (Exception e) {
                 logger.warn("Failed to parse specific date: {}", dateMatcher.group(), e);
@@ -101,17 +151,19 @@ public class TemporalReferenceService {
             try {
                 String hourStr = timeMatcher.group(2);
                 String minuteStr = timeMatcher.group(3);
-                String period = timeMatcher.group(4);
+                String periodStr = timeMatcher.group(5);
                 
                 int hour = Integer.parseInt(hourStr);
                 int minute = minuteStr != null ? Integer.parseInt(minuteStr) : 0;
                 
                 // Gestisci AM/PM o indicazioni italiane
-                if (period != null) {
-                    period = period.toLowerCase();
-                    if (period.contains("pm") || period.contains("pomeriggio") || period.contains("sera")) {
+                if (periodStr != null) {
+                    periodStr = periodStr.toLowerCase().replace("di ", "");
+                    if (periodStr.contains("pm") || periodStr.contains("pomeriggio") || periodStr.contains("sera")) {
                         if (hour < 12) hour += 12;
-                    } else if (period.contains("mattina") && hour == 12) {
+                    } else if (periodStr.contains("mattina") && hour == 12) {
+                        hour = 0;
+                    } else if (periodStr.contains("am") && hour == 12) {
                         hour = 0;
                     }
                 }
