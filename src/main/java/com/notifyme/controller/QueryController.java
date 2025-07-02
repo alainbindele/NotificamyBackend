@@ -155,7 +155,7 @@ public class QueryController {
     /**
      * Chiude una query specifica
      */
-    @PUT("/{queryId}/close")
+    @PutMapping("/{queryId}/close")
     public ResponseEntity<ApiResponse<String>> closeQuery(@PathVariable Long queryId, 
                                                          HttpServletRequest request) {
         try {
