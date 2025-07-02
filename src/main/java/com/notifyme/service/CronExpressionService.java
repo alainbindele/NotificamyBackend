@@ -4,8 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.regex.Pattern;
 
 @Service
@@ -61,15 +63,40 @@ public class CronExpressionService {
     }
     
     /**
-     * Calcola la prossima esecuzione basata sui componenti cron
+     * Calcola la prossima esecuzione basata sui componenti cron - MIGLIORATO per giorni della settimana
      */
     private LocalDateTime calculateNextExecution(LocalDateTime now, String minute, String hour, 
                                                String dayOfMonth, String month, String dayOfWeek) {
         
         LocalDateTime candidate = now.truncatedTo(ChronoUnit.MINUTES).plusMinutes(1);
         
-        // Implementazione semplificata per i casi più comuni
-        // In produzione useresti una libreria come Quartz CronExpression
+        // NUOVO: Gestione specifica per giorni della settimana
+        if (isNumeric(minute) && isNumeric(hour) && "*".equals(dayOfMonth) && 
+            "*".equals(month) && isNumeric(dayOfWeek)) {
+            
+            int targetMinute = Integer.parseInt(minute);
+            int targetHour = Integer.parseInt(hour);
+            int targetDayOfWeek = Integer.parseInt(dayOfWeek);
+            
+            // Converti da formato cron (1=lunedì, 7=domenica) a DayOfWeek Java
+            DayOfWeek javaDayOfWeek = convertCronDayToJavaDayOfWeek(targetDayOfWeek);
+            
+            LocalDateTime target = now.with(TemporalAdjusters.nextOrSame(javaDayOfWeek))
+                                     .withHour(targetHour)
+                                     .withMinute(targetMinute)
+                                     .withSecond(0)
+                                     .withNano(0);
+            
+            // Se l'orario di oggi è già passato, vai alla prossima settimana
+            if (target.isBefore(now) || target.equals(now)) {
+                target = target.with(TemporalAdjusters.next(javaDayOfWeek));
+            }
+            
+            logger.debug("Calculated next weekday execution: {} (day {}) at {}:{} -> {}", 
+                        javaDayOfWeek, targetDayOfWeek, targetHour, targetMinute, target);
+            
+            return target;
+        }
         
         // Caso: ogni minuto (* * * * *)
         if ("*".equals(minute) && "*".equals(hour) && "*".equals(dayOfMonth) && 
@@ -140,6 +167,24 @@ public class CronExpressionService {
     }
     
     /**
+     * NUOVO: Converte giorno della settimana da formato cron a DayOfWeek Java
+     */
+    private DayOfWeek convertCronDayToJavaDayOfWeek(int cronDay) {
+        switch (cronDay) {
+            case 1: return DayOfWeek.MONDAY;
+            case 2: return DayOfWeek.TUESDAY;
+            case 3: return DayOfWeek.WEDNESDAY;
+            case 4: return DayOfWeek.THURSDAY;
+            case 5: return DayOfWeek.FRIDAY;
+            case 6: return DayOfWeek.SATURDAY;
+            case 7: return DayOfWeek.SUNDAY;
+            default: 
+                logger.warn("Invalid cron day of week: {}, defaulting to Monday", cronDay);
+                return DayOfWeek.MONDAY;
+        }
+    }
+    
+    /**
      * Verifica se una stringa è numerica
      */
     private boolean isNumeric(String str) {
@@ -166,7 +211,7 @@ public class CronExpressionService {
     }
     
     /**
-     * Genera una descrizione leggibile dell'espressione cron
+     * Genera una descrizione leggibile dell'espressione cron - MIGLIORATO per giorni della settimana
      */
     public String describeCronExpression(String cronExpression) {
         if (!isValidCronExpression(cronExpression)) {
@@ -179,6 +224,14 @@ public class CronExpressionService {
         String dayOfMonth = parts[2];
         String month = parts[3];
         String dayOfWeek = parts[4];
+        
+        // Caso specifico per giorni della settimana
+        if (isNumeric(minute) && isNumeric(hour) && "*".equals(dayOfMonth) && 
+            "*".equals(month) && isNumeric(dayOfWeek)) {
+            
+            String dayName = getDayName(Integer.parseInt(dayOfWeek));
+            return String.format("Ogni %s alle %s:%02d", dayName, hour, Integer.parseInt(minute));
+        }
         
         // Implementazione semplificata per i casi più comuni
         if ("*".equals(minute) && "*".equals(hour)) {
@@ -202,5 +255,21 @@ public class CronExpressionService {
         }
         
         return "Programmazione personalizzata: " + cronExpression;
+    }
+    
+    /**
+     * NUOVO: Ottiene il nome del giorno dalla settimana
+     */
+    private String getDayName(int cronDay) {
+        switch (cronDay) {
+            case 1: return "lunedì";
+            case 2: return "martedì";
+            case 3: return "mercoledì";
+            case 4: return "giovedì";
+            case 5: return "venerdì";
+            case 6: return "sabato";
+            case 7: return "domenica";
+            default: return "giorno sconosciuto";
+        }
     }
 }

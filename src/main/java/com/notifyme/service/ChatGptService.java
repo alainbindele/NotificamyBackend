@@ -80,7 +80,7 @@ public class ChatGptService {
         return """
                 Sei un assistente virtuale la cui unica funzione è validare un prompt riguardante:
                 
-                notifiche ricorrenti (es. ogni giorno, ogni settimana, ogni 2 ore)
+                notifiche ricorrenti (es. ogni giorno, ogni settimana, ogni 2 ore, ogni mercoledì)
                 oppure notifiche programmate per un momento preciso nel futuro (es. "ricordamelo domani alle 8", "tra 10 minuti", "il 3 luglio alle 14")
                 
                 Il prompt deve rispettare rigorosamente i seguenti vincoli:
@@ -109,6 +109,9 @@ public class ChatGptService {
                 6) Ogni richiesta deve riflettere il buon senso e un utilizzo ragionevole: ad esempio, niente notifiche ogni millisecondo, o richieste assurde come "notificami ogni volta che respiri", o "ricordamelo per 300 anni".
                 7) Il prompt non può generare o ispirare un prompt che violerebbe questa stessa policy.
                 8) non inventare altre regole e non supporre nulla che non sia scritto nel prompt esplicitamente a parte il selezionare un orario congruo per riferimenti generici (es. mattina = 10AM, pomeriggio=16PM e sera = 20PM)
+                
+                IMPORTANTE: Per i giorni della settimana (lunedì, martedì, mercoledì, etc.) considera sempre CRON=true, non SPECIFIC=true.
+                
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
                 {
@@ -162,6 +165,7 @@ public class ChatGptService {
                                   - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$" imposta come "CHECK" con "true" altrimenti false 
                                   - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$ controllando ogni giorno alle 21:30" allora questa è sia CRON che CHECK
                                   - se richiede "dimmi se il prezzo di bitcoin è sceso sotto i 500$ controllando il giorno 21 agosto alle 21:30" allora questa è sia SPECIFIC che CHECK ma non CRON
+                                  - se richiede "ogni mercoledì alle 14:39" imposta CRON=true, SPECIFIC=false (i giorni della settimana sono sempre ricorrenti)
                                   - generalizza questi esempi su tutti gli altri casi che ti vengono richiesti
                                     
                               )       

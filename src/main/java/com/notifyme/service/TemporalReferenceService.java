@@ -4,10 +4,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAdjusters;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,6 +31,11 @@ public class TemporalReferenceService {
     // CORRETTO: Pattern per orari specifici
     private static final Pattern SPECIFIC_TIME_PATTERN = Pattern.compile(
         "(?i)\\ball[''']?\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(di\\s+)?(am|pm|mattina|pomeriggio|sera))?\\b"
+    );
+    
+    // NUOVO: Pattern per giorni della settimana con orario
+    private static final Pattern WEEKDAY_PATTERN = Pattern.compile(
+        "(?i)\\b(ogni|every)\\s+(lunedì|martedì|mercoledì|giovedì|venerdì|sabato|domenica|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\\s+alle?\\s+(\\d{1,2})(?::(\\d{2}))?)?\\b"
     );
     
     // Pattern per intervalli ricorrenti - MIGLIORATO per catturare "controllando ogni X"
@@ -54,11 +61,18 @@ public class TemporalReferenceService {
         
         TemporalReference reference = new TemporalReference();
         
-        // Estrai data/ora specifica
-        extractSpecificDateTime(prompt, reference);
+        // NUOVO: Prima controlla giorni della settimana
+        extractWeekdayPattern(prompt, reference);
         
-        // Estrai pattern ricorrente (inclusi controlli)
-        extractRecurringPattern(prompt, reference);
+        // Estrai data/ora specifica (solo se non abbiamo già un weekday)
+        if (!reference.hasRecurringPattern()) {
+            extractSpecificDateTime(prompt, reference);
+        }
+        
+        // Estrai pattern ricorrente (inclusi controlli) - solo se non abbiamo weekday
+        if (!reference.hasRecurringPattern()) {
+            extractRecurringPattern(prompt, reference);
+        }
         
         // Estrai intervallo di controllo specifico
         extractCheckInterval(prompt, reference);
@@ -68,6 +82,50 @@ public class TemporalReferenceService {
         
         logger.debug("Extracted temporal reference: {}", reference);
         return reference;
+    }
+    
+    /**
+     * NUOVO: Estrae pattern per giorni della settimana
+     */
+    private void extractWeekdayPattern(String prompt, TemporalReference reference) {
+        Matcher matcher = WEEKDAY_PATTERN.matcher(prompt);
+        
+        if (matcher.find()) {
+            try {
+                String weekdayStr = matcher.group(2).toLowerCase();
+                String hourStr = matcher.group(3);
+                String minuteStr = matcher.group(4);
+                
+                // Converti giorno della settimana
+                int dayOfWeek = parseWeekday(weekdayStr);
+                
+                // Estrai orario
+                int hour = 10; // Default
+                int minute = 0; // Default
+                
+                if (hourStr != null) {
+                    hour = Integer.parseInt(hourStr);
+                    minute = minuteStr != null ? Integer.parseInt(minuteStr) : 0;
+                } else {
+                    // Cerca orario altrove nel prompt
+                    Matcher timeInPrompt = SPECIFIC_TIME_PATTERN.matcher(prompt);
+                    if (timeInPrompt.find()) {
+                        hour = Integer.parseInt(timeInPrompt.group(1));
+                        minute = timeInPrompt.group(2) != null ? Integer.parseInt(timeInPrompt.group(2)) : 0;
+                    }
+                }
+                
+                // Costruisci espressione cron per il giorno della settimana
+                String cronExpression = String.format("%d %d * * %d", minute, hour, dayOfWeek);
+                reference.setCronExpression(cronExpression);
+                
+                logger.info("Extracted weekday pattern: '{}' at {}:{} -> cron: {}", 
+                           weekdayStr, hour, minute, cronExpression);
+                
+            } catch (Exception e) {
+                logger.warn("Failed to parse weekday pattern: {}", matcher.group(), e);
+            }
+        }
     }
     
     /**
@@ -357,6 +415,23 @@ public class TemporalReferenceService {
             } catch (Exception e) {
                 logger.warn("Failed to parse validity period: {}", matcher.group(), e);
             }
+        }
+    }
+    
+    /**
+     * NUOVO: Converte giorno della settimana in numero cron (1=lunedì, 7=domenica)
+     */
+    private int parseWeekday(String weekdayStr) {
+        weekdayStr = weekdayStr.toLowerCase();
+        switch (weekdayStr) {
+            case "lunedì": case "monday": return 1;
+            case "martedì": case "tuesday": return 2;
+            case "mercoledì": case "wednesday": return 3;
+            case "giovedì": case "thursday": return 4;
+            case "venerdì": case "friday": return 5;
+            case "sabato": case "saturday": return 6;
+            case "domenica": case "sunday": return 7;
+            default: throw new IllegalArgumentException("Unknown weekday: " + weekdayStr);
         }
     }
     
