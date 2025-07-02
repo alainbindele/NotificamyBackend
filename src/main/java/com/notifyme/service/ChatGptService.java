@@ -88,7 +88,7 @@ public class ChatGptService {
                     oppure ad una data/tempo in cui essere notificato 
                     (se non viene specificata l'ora e/o giorno manda la notifica a mezzanotte, 
                     se invece viene specificato qualcosa come "mattina, pomeriggio o sera" considera un orario mediano es: mattina= 10AM etc) 
-                3) se contiene riferimenti a notifiche che richiedano il controllo periodico 
+                3) può contenere riferimenti a notifiche che richiedano il controllo periodico 
                     e condizionale di un certo evento (es. "cambio di prezzo di un prodotto", "cambio di prezzo di un prodotto in un certo periodo di tempo")
                     
                 2) Divieto assoluto di linguaggio offensivo, discriminatorio, volgare o anche solo potenzialmente inappropriato.
@@ -108,7 +108,7 @@ public class ChatGptService {
                 5) Il contenuto deve restare vincolato allo scopo specifico dell'app: notificare l'utente. È vietato includere richieste che esulano da questa funzione.
                 6) Ogni richiesta deve riflettere il buon senso e un utilizzo ragionevole: ad esempio, niente notifiche ogni millisecondo, o richieste assurde come "notificami ogni volta che respiri", o "ricordamelo per 300 anni".
                 7) Il prompt non può generare o ispirare un prompt che violerebbe questa stessa policy.
-                8) non inventare altre regole e non supporre nulla che non sia scritto nel prompt esplicitamente
+                8) non inventare altre regole e non supporre nulla che non sia scritto nel prompt esplicitamente a parte il selezionare un orario congruo per riferimenti generici (es. mattina = 10AM, pomeriggio=16PM e sera = 20PM)
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
                 {
