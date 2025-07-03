@@ -166,6 +166,9 @@ public class ChatGptService {
                 
                 PARSING TEMPORALE DETTAGLIATO:
                 Devi analizzare con precisione i riferimenti temporali usando la data/ora UTC corrente come riferimento e compilare correttamente i campi:
+
+                - PROSSIMA DATA UTILE
+                - "notificami il 21 gennaio sulle ultime notizie di economia" si intende il PROSSIMO 21 Gennaio
                 
                 CALCOLI TEMPORALI BASATI SU UTC:
                 - "domani" = data UTC corrente + 1 giorno
@@ -202,7 +205,7 @@ public class ChatGptService {
                 - "avvisami stasera" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE] 20:00:00" (DEVI inventare 20:00)
                 - "dimmi quando piove" → CHECK=true, CRON=true, cron_expression="0 10 * * *" (NON inventare orario specifico)
                 - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_UTC_CORRENTE+30_MINUTI]"
-                
+                      
                 IMPORTANTE: Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
                 
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
