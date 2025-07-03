@@ -46,12 +46,13 @@ auth0:
   domain: ${AUTH0_DOMAIN}
   audience: ${AUTH0_AUDIENCE}
 
-# OpenAI Configuration - AGGIORNATO per GPT-4o
+# OpenAI Configuration - CORRETTA per evitare errori 400
 openai:
   api:
     key: ${OPENAI_API_KEY}
     url: https://api.openai.com/v1/chat/completions
-  model: ${OPENAI_MODEL:gpt-4o} # Configurabile tramite variabile d'ambiente
+  # IMPORTANTE: Usa gpt-4o-mini se gpt-4o non è disponibile nel tuo account
+  model: ${OPENAI_MODEL:gpt-4o-mini}
 
 # Logging
 logging:

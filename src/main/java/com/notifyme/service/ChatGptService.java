@@ -9,12 +9,15 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.HashMap;
 
 @Service
 public class ChatGptService {
@@ -65,19 +68,34 @@ public class ChatGptService {
             
             String policy = buildPolicy();
             ChatGptRequest request = new ChatGptRequest(policy, prompt);
+            
+            // Costruisci la richiesta e logga per debugging
+            Map<String, Object> requestBody = buildOpenAiRequest(request, currentTimestamp);
+            logger.debug("OpenAI request body: {}", requestBody);
 
             ChatGptResponse response = webClient.post()
                     .uri(apiUrl)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                    .bodyValue(buildOpenAiRequest(request, currentTimestamp))
+                    .bodyValue(requestBody)
                     .retrieve()
+                    .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
+                             clientResponse -> {
+                                 return clientResponse.bodyToMono(String.class)
+                                     .map(errorBody -> {
+                                         logger.error("OpenAI API error response: {}", errorBody);
+                                         return new RuntimeException("OpenAI API error: " + errorBody);
+                                     });
+                             })
                     .bodyToMono(ChatGptResponse.class)
-                    .timeout(Duration.ofSeconds(60)) // Aumentato timeout per GPT-4o
+                    .timeout(Duration.ofSeconds(60))
                     .block();
                     
             logger.info("Successfully received response from OpenAI API using {}", model);
             return response;
             
+        } catch (WebClientResponseException e) {
+            logger.error("OpenAI API HTTP error - Status: {}, Body: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Failed to get response from ChatGPT: " + e.getStatusCode() + " " + e.getStatusText() + " - " + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
             logger.error("Failed to get response from ChatGPT ({}): {}", model, e.getMessage(), e);
             throw new RuntimeException("Failed to get response from ChatGPT: " + e.getMessage(), e);
@@ -195,94 +213,93 @@ public class ChatGptService {
                    "generated_by": "system",
                    "when_notify":{
                         "type":{
-                            "CRON":true|false,
-                            "SPECIFIC":true|false,
-                            "CHECK":true|false
+                            "CRON":true,
+                            "SPECIFIC":false,
+                            "CHECK":false
                         },
-                        "cron_expression":"{CRON_ESPRESSION}"|null,
-                        "date_time":"{YYYY-MM-DD HH:MM:SS}"|null,
-                        "start_date":"{YYYY-MM-DD HH:MM:SS}"|null,
-                        "end_date":"{YYYY-MM-DD HH:MM:SS}"|null
+                        "cron_expression":"0 9 * * *",
+                        "date_time":null,
+                        "start_date":null,
+                        "end_date":null
                    },
                    "validity": {
-                     "out_of_bounds_prompt_length": true|false,
-                     "offensive_language_detected": true|false,
-                     "nasty_instruction_detected": true|false,
-                     "purpose_valid": true|false,
-                     "reasonable_usage": true|false,
-                     "self_enforcing": true|false,
-                     "valid_prompt": true|false,
-                     "invalid_reason": {INVALID_REASON_IF_ANY}
+                     "out_of_bounds_prompt_length": false,
+                     "offensive_language_detected": false,
+                     "nasty_instruction_detected": false,
+                     "purpose_valid": true,
+                     "reasonable_usage": true,
+                     "self_enforcing": true,
+                     "valid_prompt": true,
+                     "invalid_reason": null
                    },
                    "summary": {
-                     "text": "L'utente ha richiesto una notifica per: {HERE_THE_GENERATED_SUMMARY}",
-                     "language": "{LANGUAGE}",
+                     "text": "L'utente ha richiesto una notifica per: promemoria giornaliero",
+                     "language": "it",
                      "category": "notification_generation"
                    },
                    "metadata": {
-                     "model_version": "{CHATGPT_MODEL_VERSION}",
-                     "confidence_score": {CONFIDENCE_SCORE},
+                     "model_version": "gpt-4o",
+                     "confidence_score": 0.95,
                      "policy_enforced": true,
-                     "tags": ["{TAG_1}", "{TAG_2}", "{TAG_3}"]
+                     "tags": ["notifica", "promemoria", "giornaliero"]
                    }
                  }
            
-                 SOSTITUISCI {HERE_THE_GENERATED_SUMMARY} con il riassunto o una parafrasi breve generata che ci dica l'argomento e la natura della REQUEST in input (es. "richiesta aggiornamento news sulla guerra in iraq" ).
-                 SOSTITUISCI true|false nei campi validity in base alla valutazione del prompt generato rispetto alle regole suddette (es "out_of_bounds_prompt_length": false se la lunghezza del prompt è minore di 50 caratteri).
-                 SOSTITUISCI {TAG_1}, {TAG_2}, {TAG_3},...,{TAG_N} con eventuali tag pertinenti al prompt generato, come "notifica", "promemoria", "evento futuro", "guerra", "iraq","news"  etc.  non lesinare nell'uso dei tag, ma mantieni la pertinenza e la specificità.
-                 SOSTITUISCI {INVALID_REASON_IF_ANY} con una stringa che spiega il motivo per cui il prompt non è valido, se applicabile (es. (ma puoi essere più spoecifico) "lunghezza del prompt eccessiva", "linguaggio offensivo rilevato", "istruzione dannosa rilevata", "utilizzo irragionevole", "auto-applicazione non valida", "non è stato specificato l'intervallo o il momento in cui essere notificato") altrimenti null.
-                 SOSTITUISCI {CHATGPT_MODEL_VERSION} con la versione del modello di ChatGPT utilizzato per generare il prompt (es. "gpt-4o").
-                 SOSTITUISCI {CONFIDENCE_SCORE} con un valore numerico tra 0 e 1 che rappresenta la fiducia del modello nella validità del prompt generato (es. 0.95).
-                 SOSTITUISCI {LANGUAGE} con la lingua in cui è stato generato il prompt (es. "it" per italiano, "en" per inglese), se il prompt è in una certa lingua anche reason e summary devono essere nella stessa lingua.
-                 SOSTITUISCI true|false nei campi CRON, SPECIFIC,CHECK in base alla rilevazione della temporalità della richiesta 
-                             (es. - se il prompt richiede "ogni giorno alle 18" imposta con "CRON" con true altrimenti false
-                                  - se richiede "il giorno 15 AGOSTO alle 20" imposta con "SPECIFIC" con true altrimenti false 
-                                  - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$" imposta come "CHECK" con "true" altrimenti false 
-                                  - se richiede "dimmi se il prezzo di bitcoin scende sotto i 500$ controllando ogni giorno alle 21:30" allora questa è sia CRON che CHECK
-                                  - se richiede "dimmi se il prezzo di bitcoin è sceso sotto i 500$ controllando il giorno 21 agosto alle 21:30" allora questa è sia SPECIFIC che CHECK ma non CRON
-                                  - se richiede "ogni mercoledì alle 14:39" imposta CRON=true, SPECIFIC=false (i giorni della settimana sono sempre ricorrenti)
-                                  - generalizza questi esempi su tutti gli altri casi che ti vengono richiesti
-                                    
-                              )       
-                 SOSTITUISCI {CRON_ESPRESSION} con l'espressione CRONTAB standard di linux che rappresenta il cron che potrebbe essere impostato per quella specifica richiesta (ovviamente se è rilevato CRON come true in "when_notify->type") altrimenti null
-                 SOSTITUISCI {YYYY-MM-DD HH:MM:SS} con il datetime in questo formato se rilevi SPECIFIC come true altrimenti null
-                 SOSTITUISCI {YYYY-MM-DD HH:MM:SS}" oppure null in start_time e/o end_time se richiesto che le notifiche abbiano un intervallo di validità specifico
-                 TIENI A MENTE QUESTE POSSIBILI CONFIGURAZIONI PER QUANTO RIGUARDA I FLAG TYPE:
-                 cron   date_specific         to_check        Description
-                  0          	0                   0           NOT_VALID
-                  1 					0					          0			      Simply recurrent
-                  1 					1					          0			      NOT_VALID
-                  0 					1 					        0			      Simply in a certain date/datetime
-                  0           0                   1           Check if a condition is met (default:daily i.e SET CRON ONCE A DAY AT 10AM )
-                  1 					0					          1			      Check if a condition is met with a specified frequency
-                  1 					1					          1			      Check if a condition is met in a certain date/datetime with a specified check frequency (CASO 5)
-                  0 					1 					        1			      Check if a condition is met in a certain date/datetime
-                I messaggi contrassegnati come "NOT_VALID" saranno invalidi per il fatto che non possono essere specifici e ricorrenti allo stesso tempo 
-                e non possono essere lasciati NON specificati tutti e 3 i campi type
+                 SOSTITUISCI i valori nell'esempio con quelli appropriati per il prompt specifico:
+                 - {HERE_THE_GENERATED_SUMMARY} con il riassunto del prompt
+                 - true|false nei campi validity in base alla valutazione
+                 - {TAG_1}, {TAG_2}, {TAG_3} con tag pertinenti
+                 - {INVALID_REASON_IF_ANY} con motivo se non valido, altrimenti null
+                 - {CHATGPT_MODEL_VERSION} con "gpt-4o"
+                 - {CONFIDENCE_SCORE} con valore 0.00-1.00
+                 - {LANGUAGE} con "it" o "en" etc.
+                 - true|false nei campi CRON, SPECIFIC, CHECK in base al tipo di richiesta
+                 - {CRON_ESPRESSION} con espressione cron se CRON=true, altrimenti null
+                 - {YYYY-MM-DD HH:MM:SS} con datetime se SPECIFIC=true, altrimenti null
+                 
+                 CONFIGURAZIONI VALIDE:
+                 cron=0, specific=0, check=0 → NOT_VALID
+                 cron=1, specific=0, check=0 → Simply recurrent
+                 cron=1, specific=1, check=0 → NOT_VALID
+                 cron=0, specific=1, check=0 → Simply in a certain date/datetime
+                 cron=0, specific=0, check=1 → Check condition (default daily at 10AM)
+                 cron=1, specific=0, check=1 → Check condition with specified frequency
+                 cron=1, specific=1, check=1 → Check condition at specific date with frequency
+                 cron=0, specific=1, check=1 → Check condition at specific date/datetime
                 """;
     }
 
-    private Object buildOpenAiRequest(ChatGptRequest request, String currentTimestamp) {
-        return new Object() {
-            public final String model = ChatGptService.this.model; // Usa il modello configurabile
-            public final Object[] messages = {
-                new Object() {
-                    public final String role = "system";
-                    public final String content = request.getPolicy();
-                },
-                new Object() {
-                    public final String role = "user";
-                    public final String content = String.format(
-                        "DATA/ORA UTC CORRENTE: %s\n\nPROMPT UTENTE: %s", 
-                        currentTimestamp, 
-                        request.getClientPrompt()
-                    );
-                }
-            };
-            public final int max_tokens = 1500; // Aumentato per GPT-4o
-            public final double temperature = 0.1; // Ridotto ulteriormente per maggiore consistenza
-            public final double top_p = 0.9; // Aggiunto per migliore qualità
-            public final String response_format = "json_object"; // NUOVO: Forza risposta JSON
-        };
+    private Map<String, Object> buildOpenAiRequest(ChatGptRequest request, String currentTimestamp) {
+        Map<String, Object> requestBody = new HashMap<>();
+        
+        // Modello - IMPORTANTE: Verifica che sia supportato
+        requestBody.put("model", model);
+        
+        // Messaggi
+        Map<String, Object> systemMessage = new HashMap<>();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", request.getPolicy());
+        
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        userMessage.put("content", String.format(
+            "DATA/ORA UTC CORRENTE: %s\n\nPROMPT UTENTE: %s", 
+            currentTimestamp, 
+            request.getClientPrompt()
+        ));
+        
+        requestBody.put("messages", new Object[]{systemMessage, userMessage});
+        
+        // Parametri - CORRETTI per evitare errori 400
+        requestBody.put("max_tokens", 1500);
+        requestBody.put("temperature", 0.1);
+        requestBody.put("top_p", 0.9);
+        
+        // IMPORTANTE: response_format per GPT-4o deve essere un oggetto
+        Map<String, String> responseFormat = new HashMap<>();
+        responseFormat.put("type", "json_object");
+        requestBody.put("response_format", responseFormat);
+        
+        return requestBody;
     }
 }
