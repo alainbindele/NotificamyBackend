@@ -107,10 +107,22 @@ public class PromptController {
             if (chatGptResponse != null && chatGptResponse.getChoices() != null && !chatGptResponse.getChoices().isEmpty()) {
                 String content = chatGptResponse.getChoices().get(0).getMessage().getContent();
                 logger.info("ChatGPT response received successfully for user: {}", userId);
+                logger.debug("Raw ChatGPT response content: {}", content);
                 
                 // Parse ChatGPT response to extract validation data
                 try {
-                    ChatGptValidationResponse validationResponse = objectMapper.readValue(content, ChatGptValidationResponse.class);
+                    // Pulisci il contenuto prima del parsing
+                    String cleanedContent = cleanJsonResponse(content);
+                    logger.debug("Cleaned ChatGPT response: {}", cleanedContent);
+                    
+                    ChatGptValidationResponse validationResponse = objectMapper.readValue(cleanedContent, ChatGptValidationResponse.class);
+                    
+                    // Verifica che la risposta sia valida
+                    if (validationResponse == null) {
+                        throw new Exception("Parsed response is null");
+                    }
+                    
+                    logger.info("Successfully parsed ChatGPT validation response for user: {}", userId);
                     
                     // Save query to database with complete validation data
                     if (user != null) {
@@ -155,8 +167,9 @@ public class PromptController {
                     }
                     
                 } catch (Exception parseException) {
-                    logger.warn("Failed to parse ChatGPT validation response, saving as fallback query: {}", parseException.getMessage());
-                    logger.debug("Raw ChatGPT response that failed to parse: {}", content);
+                    logger.error("Failed to parse ChatGPT validation response: {}", parseException.getMessage());
+                    logger.error("Raw response that failed to parse: {}", content);
+                    logger.error("Parse exception details: ", parseException);
                     
                     // Save query anyway, but mark as invalid due to parsing error
                     if (user != null) {
@@ -167,6 +180,9 @@ public class PromptController {
                         return ResponseEntity.badRequest()
                                 .body(ApiResponse.error("Errore nell'elaborazione del prompt. Riprova con una formulazione diversa."));
                     }
+                    
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(ApiResponse.error("Errore nel parsing della risposta AI. Riprova più tardi."));
                 }
                 
                 // Return simple string response like commit 96e0d594
@@ -182,6 +198,42 @@ public class PromptController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.<String>error("Error processing your request: " + e.getMessage()));
         }
+    }
+
+    /**
+     * Pulisce la risposta JSON da ChatGPT rimuovendo caratteri non validi
+     */
+    private String cleanJsonResponse(String content) {
+        if (content == null || content.trim().isEmpty()) {
+            return content;
+        }
+        
+        // Rimuovi eventuali caratteri di controllo o non stampabili
+        String cleaned = content.replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", "");
+        
+        // Rimuovi eventuali prefissi/suffissi non JSON
+        cleaned = cleaned.trim();
+        
+        // Se la risposta inizia con ```json, rimuovilo
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        }
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        
+        // Trova l'inizio e la fine del JSON
+        int startIndex = cleaned.indexOf('{');
+        int endIndex = cleaned.lastIndexOf('}');
+        
+        if (startIndex >= 0 && endIndex > startIndex) {
+            cleaned = cleaned.substring(startIndex, endIndex + 1);
+        }
+        
+        return cleaned.trim();
     }
 
     @GetMapping("/user-info")

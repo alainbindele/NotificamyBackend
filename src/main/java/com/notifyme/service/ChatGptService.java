@@ -185,6 +185,8 @@ public class ChatGptService {
                 - "dimmi quando piove" → CHECK=true, CRON=true, cron_expression="0 10 * * *" (NON inventare orario specifico)
                 - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_UTC_CORRENTE+30_MINUTI]"
                 
+                IMPORTANTE: Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
+                
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
                 {
@@ -278,8 +280,9 @@ public class ChatGptService {
                 }
             };
             public final int max_tokens = 1500; // Aumentato per GPT-4o
-            public final double temperature = 0.3; // Ridotto per maggiore precisione
+            public final double temperature = 0.1; // Ridotto ulteriormente per maggiore consistenza
             public final double top_p = 0.9; // Aggiunto per migliore qualità
+            public final String response_format = "json_object"; // NUOVO: Forza risposta JSON
         };
     }
 }
