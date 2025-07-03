@@ -116,6 +116,14 @@ public class ChatGptService {
                 notifiche ricorrenti (es. ogni giorno, ogni settimana, ogni 2 ore, ogni mercoledì)
                 oppure notifiche programmate per un momento preciso nel futuro (es. "ricordamelo domani alle 8", "tra 10 minuti", "il 3 luglio alle 14")
                 
+                🚨 REGOLA FONDAMENTALE PER LE DATE: 
+                TUTTE le date specificate dall'utente si riferiscono SEMPRE alla PROSSIMA occorrenza utile di quella data.
+                
+                ESEMPI CRITICI:
+                - "notificami il 21 gennaio" = il PROSSIMO 21 gennaio (2025 se siamo nel 2024, o 2026 se siamo già a febbraio 2025)
+                - "ricordami il 15 marzo" = il PROSSIMO 15 marzo disponibile
+                - "avvisami il 31 dicembre" = il PROSSIMO 31 dicembre
+                
                 IMPORTANTE: Usa la data/ora UTC corrente fornita nel messaggio come riferimento temporale per tutte le valutazioni e calcoli di date/orari.
                 
                 Il prompt deve rispettare rigorosamente i seguenti vincoli:
@@ -164,11 +172,23 @@ public class ChatGptService {
                 
                 IMPORTANTE: Per i giorni della settimana (lunedì, martedì, mercoledì, etc.) considera sempre CRON=true, non SPECIFIC=true.
                 
-                PARSING TEMPORALE DETTAGLIATO:
+                PARSING TEMPORALE DETTAGLIATO - REGOLE PER DATE FUTURE:
                 Devi analizzare con precisione i riferimenti temporali usando la data/ora UTC corrente come riferimento e compilare correttamente i campi:
 
-                - PROSSIMA DATA UTILE
-                - "notificami il 21 gennaio sulle ultime notizie di economia" si intende il PROSSIMO 21 Gennaio
+                🎯 ALGORITMO PER DATE SPECIFICHE:
+                1. Estrai giorno e mese dal prompt (es. "21 gennaio")
+                2. Determina l'anno: 
+                   - Se la data è nel futuro rispetto alla data UTC corrente → usa l'anno corrente
+                   - Se la data è nel passato rispetto alla data UTC corrente → usa l'anno successivo
+                3. Se non viene specificato l'orario → usa 00:00:00 (mezzanotte)
+                4. Se viene specificato un orario generico (mattina/pomeriggio/sera) → usa gli orari standard
+                
+                ESEMPI PRATICI (assumendo data UTC corrente = 2024-07-03):
+                - "notificami il 21 gennaio" → "2025-01-21 00:00:00" (prossimo gennaio)
+                - "ricordami il 15 marzo" → "2025-03-15 00:00:00" (prossimo marzo)
+                - "avvisami il 1 giugno" → "2025-06-01 00:00:00" (prossimo giugno)
+                - "notificami il 21 gennaio alle 9" → "2025-01-21 09:00:00"
+                - "ricordami il 15 marzo mattina" → "2025-03-15 10:00:00"
                 
                 CALCOLI TEMPORALI BASATI SU UTC:
                 - "domani" = data UTC corrente + 1 giorno
@@ -188,7 +208,7 @@ public class ChatGptService {
                 
                 2) DATE_TIME: Usa il formato "YYYY-MM-DD HH:MM:SS" per date/orari specifici CALCOLATI dalla data UTC corrente
                    - Per "domani all'una di pomeriggio" → calcola la data di domani dalla data UTC e imposta "YYYY-MM-DD 13:00:00"
-                   - Per "il 21 gennaio alle 9" → "2025-01-21 09:00:00" (usa anno corrente se non specificato)
+                   - Per "il 21 gennaio alle 9" → "2025-01-21 09:00:00" (SEMPRE prossima occorrenza)
                    - Per "stasera" → data UTC corrente con orario 20:00:00
                    - Per "domani mattina" → data UTC corrente + 1 giorno con orario 10:00:00
                    - Per "tra 2 ore" → ora UTC corrente + 2 ore nel formato YYYY-MM-DD HH:MM:SS
@@ -205,6 +225,7 @@ public class ChatGptService {
                 - "avvisami stasera" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE] 20:00:00" (DEVI inventare 20:00)
                 - "dimmi quando piove" → CHECK=true, CRON=true, cron_expression="0 10 * * *" (NON inventare orario specifico)
                 - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_UTC_CORRENTE+30_MINUTI]"
+                - "notificami il 21 gennaio sulle notizie" → SPECIFIC=true, date_time="2025-01-21 00:00:00" (PROSSIMO 21 gennaio)
                       
                 IMPORTANTE: Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
                 
@@ -216,12 +237,12 @@ public class ChatGptService {
                    "generated_by": "system",
                    "when_notify":{
                         "type":{
-                            "CRON":true,
-                            "SPECIFIC":false,
+                            "CRON":false,
+                            "SPECIFIC":true,
                             "CHECK":false
                         },
-                        "cron_expression":"0 9 * * *",
-                        "date_time":null,
+                        "cron_expression":null,
+                        "date_time":"2025-01-21 00:00:00",
                         "start_date":null,
                         "end_date":null
                    },
@@ -236,7 +257,7 @@ public class ChatGptService {
                      "invalid_reason": null
                    },
                    "summary": {
-                     "text": "L'utente ha richiesto una notifica per: promemoria giornaliero",
+                     "text": "L'utente ha richiesto una notifica per: notizie di economia il 21 gennaio",
                      "language": "it",
                      "category": "notification_generation"
                    },
@@ -244,7 +265,7 @@ public class ChatGptService {
                      "model_version": "gpt-4o",
                      "confidence_score": 0.95,
                      "policy_enforced": true,
-                     "tags": ["notifica", "promemoria", "giornaliero"]
+                     "tags": ["notifica", "notizie", "economia", "data_specifica"]
                    }
                  }
            
