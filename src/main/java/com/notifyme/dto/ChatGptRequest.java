@@ -25,11 +25,12 @@ public class ChatGptRequest {
     @JsonProperty("user_timestamp")
     private String userTimestamp;
     
-    public ChatGptRequest(String policy, String clientPrompt, String userTimezone, String utcTimestamp, String userTimestamp) {
+    // Costruttore per compatibilità con il vecchio codice (senza timezone)
+    public ChatGptRequest(String policy, String clientPrompt) {
         this.policy = policy;
         this.clientPrompt = clientPrompt;
-        this.userTimezone = userTimezone;
-        this.utcTimestamp = utcTimestamp;
-        this.userTimestamp = userTimestamp;
+        this.userTimezone = null;
+        this.utcTimestamp = null;
+        this.userTimestamp = null;
     }
 }
