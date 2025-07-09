@@ -226,8 +226,10 @@ public class ChatGptService {
                 - "dimmi quando piove" → CHECK=true, CRON=true, cron_expression="0 10 * * *" (NON inventare orario specifico)
                 - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_UTC_CORRENTE+30_MINUTI]"
                 - "notificami il 21 gennaio sulle notizie" → SPECIFIC=true, date_time="2025-01-21 00:00:00" (PROSSIMO 21 gennaio)
-                      
-                IMPORTANTE: Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
+                 
+                IMPORTANTE: 
+                    - Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
+                    - Se deduci dalla data di notifica che SPECIFIC=true allora imposta anche end_date per quella data 
                 
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
