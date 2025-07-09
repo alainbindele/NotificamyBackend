@@ -175,7 +175,7 @@ public class ChatGptService {
                 PARSING TEMPORALE DETTAGLIATO - REGOLE PER DATE FUTURE:
                 Devi analizzare con precisione i riferimenti temporali usando la data/ora UTC corrente come riferimento e compilare correttamente i campi:
 
-                🎯 ALGORITMO PER DATE SPECIFICHE:
+                🎯 ALGORITMO PER DATE SPECIFICHE IN CUI NON SIA SPECIFICATO L'ANNO:
                 1. Estrai giorno e mese dal prompt (es. "21 gennaio")
                 2. Determina l'anno: 
                    - Se la data è nel futuro rispetto alla data UTC corrente → usa l'anno corrente
@@ -229,7 +229,7 @@ public class ChatGptService {
                  
                 IMPORTANTE: 
                     - Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
-                    - Se SPECIFIC=true allora imposta anche end_date per quella data 
+                    - Se SPECIFIC=true → imposta end_date=(date_time + 30 minuti) perchè devi stabilire un intervallo di tempo finale per il controllo
                 
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
