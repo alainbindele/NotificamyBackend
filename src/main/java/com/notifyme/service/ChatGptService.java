@@ -284,8 +284,8 @@ public class ChatGptService {
                         },
                         "cron_expression":null,
                         "date_time":"2025-01-21 00:00:00 Asia/Tokyo",
-                        "start_date":null,
-                        "end_date":null
+                        "start_date":"YYYY-MM-DD HH:MM:SS Asia/Tokyo",
+                        "end_date":"2025-01-21 00:30:00  Asia/Tokyo"
                    },
                    "validity": {
                      "out_of_bounds_prompt_length": false,
