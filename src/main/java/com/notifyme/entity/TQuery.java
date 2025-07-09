@@ -58,6 +58,10 @@ public class TQuery {
     // Notification channels
     @Column(name = "enabled_channels", columnDefinition = "TEXT")
     private String enabledChannels;
+    
+    // User timezone
+    @Column(name = "timezone", length = 50)
+    private String timezone;
 
     // ChatGPT validation fields
     @Column(name = "out_of_bounds_prompt_length")

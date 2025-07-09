@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.ZoneOffset;
 
 @Service
 public class ValidationLogicService {
@@ -23,10 +26,13 @@ public class ValidationLogicService {
     /**
      * Applica la logica di validazione e calcolo usando SOLO i dati di ChatGPT
      */
-    public TQuery applyValidationLogic(TUser user, String prompt, ChatGptValidationResponse validationResponse) {
+    public TQuery applyValidationLogic(TUser user, String prompt, ChatGptValidationResponse validationResponse, String userTimezone) {
         logger.info("Applying validation logic for user: {} with prompt: {}", user.getEmail(), prompt);
         
         TQuery query = new TQuery(user, prompt);
+        
+        // Imposta la timezone dell'utente
+        query.setTimezone(userTimezone);
         
         // 1. Mappa i dati base dalla risposta ChatGPT
         mapBasicValidationData(query, validationResponse);
@@ -38,7 +44,7 @@ public class ValidationLogicService {
         }
         
         // 3. Estrai e applica i dati temporali SOLO dalla risposta ChatGPT
-        extractAndApplyTemporalDataFromChatGPT(query, validationResponse);
+        extractAndApplyTemporalDataFromChatGPT(query, validationResponse, userTimezone);
         
         // 4. Valida presenza di contenuto/evento
         if (!hasContentOrEvent(prompt)) {
@@ -114,7 +120,7 @@ public class ValidationLogicService {
     /**
      * Estrae e applica i dati temporali ESCLUSIVAMENTE dalla risposta ChatGPT
      */
-    private void extractAndApplyTemporalDataFromChatGPT(TQuery query, ChatGptValidationResponse validationResponse) {
+    private void extractAndApplyTemporalDataFromChatGPT(TQuery query, ChatGptValidationResponse validationResponse, String userTimezone) {
         if (validationResponse.getWhenNotify() == null) {
             logger.warn("No when_notify data in ChatGPT response");
             query.setIsValid(false);
@@ -161,7 +167,7 @@ public class ValidationLogicService {
             String dateTimeStr = whenNotify.getDateTime().trim();
             
             try {
-                LocalDateTime specificDateTime = parseDateTime(dateTimeStr);
+                LocalDateTime specificDateTime = parseDateTime(dateTimeStr, userTimezone);
                 
                 // Se non abbiamo già next_execution dal cron, usa la data specifica
                 if (query.getNextExecution() == null) {
@@ -180,7 +186,7 @@ public class ValidationLogicService {
         // 4. Estrai periodo di validità
         if (whenNotify.getStartDate() != null && !whenNotify.getStartDate().trim().isEmpty()) {
             try {
-                LocalDateTime validFrom = parseDateTime(whenNotify.getStartDate().trim());
+                LocalDateTime validFrom = parseDateTime(whenNotify.getStartDate().trim(), userTimezone);
                 query.setValidFrom(validFrom);
                 logger.debug("Set valid_from: {}", validFrom);
             } catch (Exception e) {
@@ -190,7 +196,7 @@ public class ValidationLogicService {
         
         if (whenNotify.getEndDate() != null && !whenNotify.getEndDate().trim().isEmpty()) {
             try {
-                LocalDateTime validTo = parseDateTime(whenNotify.getEndDate().trim());
+                LocalDateTime validTo = parseDateTime(whenNotify.getEndDate().trim(), userTimezone);
                 query.setValidTo(validTo);
                 logger.debug("Set valid_to: {}", validTo);
             } catch (Exception e) {
@@ -214,11 +220,35 @@ public class ValidationLogicService {
     }
     
     /**
-     * Parsa una stringa datetime nel formato "YYYY-MM-DD HH:MM:SS"
+     * Parsa una stringa datetime nel formato "YYYY-MM-DD HH:MM:SS [TIMEZONE]" e converte in UTC
      */
-    private LocalDateTime parseDateTime(String dateTimeStr) {
+    private LocalDateTime parseDateTime(String dateTimeStr, String userTimezone) {
         try {
-            // Prova vari formati
+            logger.debug("Parsing datetime: '{}' with user timezone: '{}'", dateTimeStr, userTimezone);
+            
+            // Controlla se la stringa contiene già una timezone
+            if (dateTimeStr.contains(" ") && (dateTimeStr.contains("/") || dateTimeStr.contains("_"))) {
+                // Formato: "2025-01-21 08:00:00 Asia/Tokyo"
+                String[] parts = dateTimeStr.split(" ");
+                if (parts.length >= 3) {
+                    String datePart = parts[0];
+                    String timePart = parts[1];
+                    String timezonePart = parts[2];
+                    
+                    LocalDateTime localDateTime = LocalDateTime.parse(datePart + " " + timePart, 
+                                                                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    
+                    // Converte dalla timezone specificata a UTC
+                    ZoneId sourceZone = ZoneId.of(timezonePart);
+                    ZonedDateTime zonedDateTime = localDateTime.atZone(sourceZone);
+                    LocalDateTime utcDateTime = zonedDateTime.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+                    
+                    logger.debug("Converted '{}' from {} to UTC: {}", dateTimeStr, timezonePart, utcDateTime);
+                    return utcDateTime;
+                }
+            }
+            
+            // Formato senza timezone esplicita - usa la timezone dell'utente se disponibile
             DateTimeFormatter[] formatters = {
                 DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
                 DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
@@ -228,21 +258,44 @@ public class ValidationLogicService {
                 DateTimeFormatter.ofPattern("dd/MM/yyyy")
             };
             
+            LocalDateTime localDateTime = null;
             for (DateTimeFormatter formatter : formatters) {
                 try {
                     if (dateTimeStr.contains(":")) {
-                        return LocalDateTime.parse(dateTimeStr, formatter);
+                        localDateTime = LocalDateTime.parse(dateTimeStr, formatter);
+                        break;
                     } else {
                         // Se non c'è orario, aggiungi 00:00:00
-                        return LocalDateTime.parse(dateTimeStr + " 00:00:00", 
+                        localDateTime = LocalDateTime.parse(dateTimeStr + " 00:00:00", 
                                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                        break;
                     }
                 } catch (DateTimeParseException ignored) {
                     // Prova il prossimo formato
                 }
             }
             
-            throw new DateTimeParseException("Unable to parse date", dateTimeStr, 0);
+            if (localDateTime == null) {
+                throw new DateTimeParseException("Unable to parse date", dateTimeStr, 0);
+            }
+            
+            // Se abbiamo una timezone utente, converte da quella timezone a UTC
+            if (userTimezone != null && !userTimezone.trim().isEmpty()) {
+                try {
+                    ZoneId userZone = ZoneId.of(userTimezone);
+                    ZonedDateTime zonedDateTime = localDateTime.atZone(userZone);
+                    LocalDateTime utcDateTime = zonedDateTime.withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
+                    
+                    logger.debug("Converted '{}' from user timezone {} to UTC: {}", dateTimeStr, userTimezone, utcDateTime);
+                    return utcDateTime;
+                } catch (Exception e) {
+                    logger.warn("Failed to convert from user timezone '{}', using as UTC: {}", userTimezone, e.getMessage());
+                }
+            }
+            
+            // Fallback: tratta come UTC
+            logger.debug("Treating '{}' as UTC (no timezone conversion)", dateTimeStr);
+            return localDateTime;
             
         } catch (Exception e) {
             logger.error("Failed to parse datetime '{}': {}", dateTimeStr, e.getMessage());

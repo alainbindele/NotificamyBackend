@@ -32,11 +32,11 @@ public class QueryService {
     /**
      * Crea una query applicando la logica di validazione completa
      */
-    public TQuery createQuery(TUser user, String prompt, ChatGptValidationResponse validationResponse) {
+    public TQuery createQuery(TUser user, String prompt, ChatGptValidationResponse validationResponse, String userTimezone) {
         logger.info("Creating query for user: {} with validation logic", user.getEmail());
         
         // Applica la logica di validazione e calcolo
-        TQuery query = validationLogicService.applyValidationLogic(user, prompt, validationResponse);
+        TQuery query = validationLogicService.applyValidationLogic(user, prompt, validationResponse, userTimezone);
         
         // Salva nel database
         TQuery savedQuery = queryRepository.save(query);
@@ -52,8 +52,9 @@ public class QueryService {
     /**
      * Crea una query di fallback quando il parsing della risposta ChatGPT fallisce
      */
-    public TQuery createFallbackQuery(TUser user, String prompt) {
+    public TQuery createFallbackQuery(TUser user, String prompt, String userTimezone) {
         TQuery query = new TQuery(user, prompt);
+        query.setTimezone(userTimezone);
         query.setIsValid(false);
         query.setInvalidReason("Failed to parse ChatGPT validation response");
         

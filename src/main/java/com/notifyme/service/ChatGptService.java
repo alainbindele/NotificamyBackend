@@ -42,6 +42,10 @@ public class ChatGptService {
 
 
     public ChatGptResponse sendPromptToChatGptSync(String prompt) {
+        return sendPromptToChatGptSync(prompt, null);
+    }
+    
+    public ChatGptResponse sendPromptToChatGptSync(String prompt, String userTimezone) {
         try {
             // Verifica che la chiave API sia presente
             if (apiKey == null || apiKey.trim().isEmpty() || apiKey.equals("${OPENAI_API_KEY}")) {
@@ -51,14 +55,17 @@ public class ChatGptService {
             }
             
             String currentTimestamp = getCurrentUtcTimestamp();
-            logger.info("Sending request to OpenAI API: {} using model: {} at UTC time: {}", apiUrl, model, currentTimestamp);
+            String userTimestamp = getUserTimestamp(userTimezone);
+            
+            logger.info("Sending request to OpenAI API: {} using model: {} - UTC: {}, User timezone: {} ({})", 
+                       apiUrl, model, currentTimestamp, userTimezone, userTimestamp);
             logger.debug("Using API key starting with: {}", apiKey.substring(0, Math.min(10, apiKey.length())) + "...");
             
-            String policy = buildPolicy();
-            ChatGptRequest request = new ChatGptRequest(policy, prompt);
+            String policy = buildPolicy(userTimezone);
+            ChatGptRequest request = new ChatGptRequest(policy, prompt, userTimezone, currentTimestamp, userTimestamp);
             
             // Costruisci la richiesta e logga per debugging
-            Map<String, Object> requestBody = buildOpenAiRequest(request, currentTimestamp);
+            Map<String, Object> requestBody = buildOpenAiRequest(request, currentTimestamp, userTimestamp);
             logger.debug("OpenAI request body: {}", requestBody);
 
             ChatGptResponse response = webClient.post()
@@ -96,13 +103,54 @@ public class ChatGptService {
     private String getCurrentUtcTimestamp() {
         return ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
     }
+    
+    /**
+     * Ottiene il timestamp nella timezone dell'utente
+     */
+    private String getUserTimestamp(String userTimezone) {
+        if (userTimezone == null || userTimezone.trim().isEmpty()) {
+            return getCurrentUtcTimestamp(); // Fallback a UTC
+        }
+        
+        try {
+            ZoneId zoneId = ZoneId.of(userTimezone);
+            ZonedDateTime userTime = ZonedDateTime.now(zoneId);
+            return userTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z"));
+        } catch (Exception e) {
+            logger.warn("Invalid timezone '{}', falling back to UTC: {}", userTimezone, e.getMessage());
+            return getCurrentUtcTimestamp();
+        }
+    }
 
-    private String buildPolicy() {
+    private String buildPolicy(String userTimezone) {
+        String timezoneInfo = "";
+        if (userTimezone != null && !userTimezone.trim().isEmpty()) {
+            timezoneInfo = String.format("""
+                
+                🌍 TIMEZONE UTENTE: %s
+                IMPORTANTE: L'utente si trova nella timezone %s. Tutti gli orari specificati dall'utente 
+                (es. "alle 8", "mattina", "sera") devono essere interpretati nella SUA timezone locale.
+                
+                ESEMPI DI CONVERSIONE:
+                - Se l'utente dice "alle 8" e si trova in Asia/Tokyo, significa 8:00 JST
+                - Se l'utente dice "mattina" e si trova in Europe/Rome, significa 10:00 CET/CEST
+                - Se l'utente dice "sera" e si trova in America/New_York, significa 20:00 EST/EDT
+                
+                REGOLA CRITICA: Nel campo "date_time" devi sempre specificare la timezone dell'utente:
+                - Formato: "YYYY-MM-DD HH:MM:SS TIMEZONE"
+                - Esempio: "2025-01-21 08:00:00 Asia/Tokyo"
+                - Esempio: "2025-03-15 20:00:00 Europe/Rome"
+                
+                """, userTimezone, userTimezone);
+        }
+        
         return """
                 Sei un assistente virtuale la cui unica funzione è validare un prompt riguardante:
                 
                 notifiche ricorrenti (es. ogni giorno, ogni settimana, ogni 2 ore, ogni mercoledì)
                 oppure notifiche programmate per un momento preciso nel futuro (es. "ricordamelo domani alle 8", "tra 10 minuti", "il 3 luglio alle 14")
+                
+                """ + timezoneInfo + """
                 
                 🚨 REGOLA FONDAMENTALE PER LE DATE: 
                 TUTTE le date specificate dall'utente si riferiscono SEMPRE alla PROSSIMA occorrenza utile di quella data.
@@ -112,7 +160,8 @@ public class ChatGptService {
                 - "ricordami il 15 marzo" = il PROSSIMO 15 marzo disponibile
                 - "avvisami il 31 dicembre" = il PROSSIMO 31 dicembre
                 
-                IMPORTANTE: Usa la data/ora UTC corrente fornita nel messaggio come riferimento temporale per tutte le valutazioni e calcoli di date/orari.
+                IMPORTANTE: Usa la data/ora nella timezone dell'utente fornita nel messaggio come riferimento temporale 
+                per tutte le valutazioni e calcoli di date/orari. Se non è specificata una timezone, usa UTC.
                 
                 Il prompt deve rispettare rigorosamente i seguenti vincoli:
                 1) Deve indicare esplicitamente un riferimento all'intervallo temporale in cui essere eseguito 
@@ -195,25 +244,26 @@ public class ChatGptService {
                    - Giorni settimana: 1=lunedì, 2=martedì, 3=mercoledì, 4=giovedì, 5=venerdì, 6=sabato, 7=domenica
                 
                 2) DATE_TIME: Usa il formato "YYYY-MM-DD HH:MM:SS" per date/orari specifici CALCOLATI dalla data UTC corrente
-                   - Per "domani all'una di pomeriggio" → calcola la data di domani dalla data UTC e imposta "YYYY-MM-DD 13:00:00"
-                   - Per "il 21 gennaio alle 9" → "2025-01-21 09:00:00" (SEMPRE prossima occorrenza)
-                   - Per "stasera" → data UTC corrente con orario 20:00:00
-                   - Per "domani mattina" → data UTC corrente + 1 giorno con orario 10:00:00
-                   - Per "tra 2 ore" → ora UTC corrente + 2 ore nel formato YYYY-MM-DD HH:MM:SS
+                2) DATE_TIME: Usa il formato "YYYY-MM-DD HH:MM:SS TIMEZONE" per date/orari specifici nella timezone dell'utente
+                   - Per "domani all'una di pomeriggio" → calcola nella timezone utente: "YYYY-MM-DD 13:00:00 Asia/Tokyo"
+                   - Per "il 21 gennaio alle 9" → "2025-01-21 09:00:00 Europe/Rome" (nella timezone utente)
+                   - Per "stasera" → "YYYY-MM-DD 20:00:00 America/New_York" (nella timezone utente)
+                   - Per "domani mattina" → "YYYY-MM-DD 10:00:00 [TIMEZONE_UTENTE]"
+                   - Per "tra 2 ore" → calcola nella timezone utente: "YYYY-MM-DD HH:MM:SS [TIMEZONE_UTENTE]"
                 
                 3) START_DATE/END_DATE: Solo se il prompt specifica un periodo di validità
-                   - Per "dal 1 gennaio al 31 marzo" → start_date="2025-01-01 00:00:00", end_date="2025-03-31 23:59:59"
+                   - Per "dal 1 gennaio al 31 marzo" → start_date="2025-01-01 00:00:00 [TIMEZONE_UTENTE]", end_date="2025-03-31 23:59:59 [TIMEZONE_UTENTE]"
                 
-                ESEMPI DI PARSING CORRETTO CON RIFERIMENTO UTC:
+                ESEMPI DI PARSING CORRETTO CON TIMEZONE UTENTE:
                 - "notificami ogni mercoledì alle 14:39" → CRON=true, cron_expression="39 14 * * 3"
-                - "buttare la pasta domani all'una di pomeriggio" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE+1_GIORNO] 13:00:00", end_date="[DATA_UTC_CORRENTE+1_GIORNO] 13:30:00"
+                - "buttare la pasta domani all'una di pomeriggio" → SPECIFIC=true, date_time="[DATA_DOMANI] 13:00:00 Asia/Tokyo", end_date="[DATA_DOMANI] 13:30:00 Asia/Tokyo"
                 - "controllare se piove ogni giorno alle 8" → CRON=true, CHECK=true, cron_expression="0 8 * * *"
-                - "ricordami di chiamare il 15 febbraio alle 10:30" → SPECIFIC=true, date_time="2026-02-15 10:30:00", end_date="2026-02-15 11:00:00"
-                - "notificami domani mattina ..." → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE+1_GIORNO] 10:00:00" (DEVI inventare 10:00),end_date="[DATA_UTC_CORRENTE+1_GIORNO] 10:30:00"
-                - "avvisami stasera" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE] 20:00:00" (DEVI inventare 20:00) , date_time="[DATA_UTC_CORRENTE] 20:30:00"
+                - "ricordami di chiamare il 15 febbraio alle 10:30" → SPECIFIC=true, date_time="2026-02-15 10:30:00 Europe/Rome", end_date="2026-02-15 11:00:00 Europe/Rome"
+                - "notificami domani mattina ..." → SPECIFIC=true, date_time="[DATA_DOMANI] 10:00:00 Asia/Tokyo", end_date="[DATA_DOMANI] 10:30:00 Asia/Tokyo"
+                - "avvisami stasera" → SPECIFIC=true, date_time="[DATA_OGGI] 20:00:00 America/New_York", end_date="[DATA_OGGI] 20:30:00 America/New_York"
                 - "dimmi quando piove" → CHECK=true, CRON=true, cron_expression="0 10 * * *" (NON inventare orario specifico)
-                - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_UTC_CORRENTE+30_MINUTI]","end_date":"[ORA_UTC_CORRENTE+1_ORA]"
-                - "notificami il 21 gennaio sulle notizie" → SPECIFIC=true, date_time="2026-01-21 00:00:00" (PROSSIMO 21 gennaio), date_time="2026-01-21 00:30:00" (PROSSIMO 21 gennaio)
+                - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_CORRENTE+30_MIN] [TIMEZONE_UTENTE]", end_date="[ORA_CORRENTE+1_ORA] [TIMEZONE_UTENTE]"
+                - "notificami il 21 gennaio sulle notizie" → SPECIFIC=true, date_time="2026-01-21 00:00:00 [TIMEZONE_UTENTE]", end_date="2026-01-21 00:30:00 [TIMEZONE_UTENTE]"
                  
                 IMPORTANTE: 
                     - Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
@@ -232,7 +282,7 @@ public class ChatGptService {
                             "CHECK":false
                         },
                         "cron_expression":null,
-                        "date_time":"2025-01-21 00:00:00",
+                        "date_time":"2025-01-21 00:00:00 Asia/Tokyo",
                         "start_date":null,
                         "end_date":null
                    },
@@ -283,7 +333,7 @@ public class ChatGptService {
                 """;
     }
 
-    private Map<String, Object> buildOpenAiRequest(ChatGptRequest request, String currentTimestamp) {
+    private Map<String, Object> buildOpenAiRequest(ChatGptRequest request, String currentTimestamp, String userTimestamp) {
         Map<String, Object> requestBody = new HashMap<>();
         
         // Modello - IMPORTANTE: Verifica che sia supportato
@@ -296,11 +346,27 @@ public class ChatGptService {
         
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
-        userMessage.put("content", String.format(
-            "DATA/ORA UTC CORRENTE: %s\n\nPROMPT UTENTE: %s", 
-            currentTimestamp, 
-            request.getClientPrompt()
-        ));
+        
+        String messageContent;
+        if (request.getUserTimezone() != null && !request.getUserTimezone().trim().isEmpty()) {
+            messageContent = String.format(
+                "DATA/ORA UTC CORRENTE: %s\n" +
+                "DATA/ORA TIMEZONE UTENTE (%s): %s\n\n" +
+                "PROMPT UTENTE: %s", 
+                currentTimestamp,
+                request.getUserTimezone(),
+                userTimestamp,
+                request.getClientPrompt()
+            );
+        } else {
+            messageContent = String.format(
+                "DATA/ORA UTC CORRENTE: %s\n\nPROMPT UTENTE: %s", 
+                currentTimestamp, 
+                request.getClientPrompt()
+            );
+        }
+        
+        userMessage.put("content", messageContent);
         
         requestBody.put("messages", new Object[]{systemMessage, userMessage});
         

@@ -15,4 +15,21 @@ public class ChatGptRequest {
     
     @JsonProperty("client_prompt")
     private String clientPrompt;
+    
+    @JsonProperty("user_timezone")
+    private String userTimezone;
+    
+    @JsonProperty("utc_timestamp")
+    private String utcTimestamp;
+    
+    @JsonProperty("user_timestamp")
+    private String userTimestamp;
+    
+    public ChatGptRequest(String policy, String clientPrompt, String userTimezone, String utcTimestamp, String userTimestamp) {
+        this.policy = policy;
+        this.clientPrompt = clientPrompt;
+        this.userTimezone = userTimezone;
+        this.utcTimestamp = utcTimestamp;
+        this.userTimestamp = userTimestamp;
+    }
 }

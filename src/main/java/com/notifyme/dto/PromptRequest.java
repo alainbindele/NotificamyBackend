@@ -30,9 +30,18 @@ public class PromptRequest {
     @Valid
     private Map<@Size(max = 20, message = "Channel key too long") String, 
                @Size(max = 500, message = "Channel configuration too long") String> channelConfigs;
+    
+    @Size(max = 50, message = "Timezone too long")
+    private String timezone;
 
     public PromptRequest(String prompt, String email) {
         this.prompt = prompt;
         this.email = email;
+    }
+    
+    public PromptRequest(String prompt, String email, String timezone) {
+        this.prompt = prompt;
+        this.email = email;
+        this.timezone = timezone;
     }
 }

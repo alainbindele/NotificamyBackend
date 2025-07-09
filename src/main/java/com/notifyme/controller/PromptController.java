@@ -102,7 +102,7 @@ public class PromptController {
             }
 
             // Send to ChatGPT synchronously
-            ChatGptResponse chatGptResponse = chatGptService.sendPromptToChatGptSync(sanitizedPrompt);
+            ChatGptResponse chatGptResponse = chatGptService.sendPromptToChatGptSync(sanitizedPrompt, request.getTimezone());
             
             if (chatGptResponse != null && chatGptResponse.getChoices() != null && !chatGptResponse.getChoices().isEmpty()) {
                 String content = chatGptResponse.getChoices().get(0).getMessage().getContent();
@@ -126,7 +126,7 @@ public class PromptController {
                     
                     // Save query to database with complete validation data
                     if (user != null) {
-                        var savedQuery = queryService.createQuery(user, sanitizedPrompt, validationResponse);
+                        var savedQuery = queryService.createQuery(user, sanitizedPrompt, validationResponse, request.getTimezone());
                         
                         // Update query with enabled channels
                         if (request.getChannels() != null && !request.getChannels().isEmpty()) {
@@ -173,7 +173,7 @@ public class PromptController {
                     
                     // Save query anyway, but mark as invalid due to parsing error
                     if (user != null) {
-                        var fallbackQuery = queryService.createFallbackQuery(user, sanitizedPrompt);
+                        var fallbackQuery = queryService.createFallbackQuery(user, sanitizedPrompt, request.getTimezone());
                         logger.info("Fallback query saved for user: {}", userId);
                         
                         // Restituisci errore al frontend anche per fallback query
