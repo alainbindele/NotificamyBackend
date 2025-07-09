@@ -107,7 +107,7 @@ public class PromptController {
             if (chatGptResponse != null && chatGptResponse.getChoices() != null && !chatGptResponse.getChoices().isEmpty()) {
                 String content = chatGptResponse.getChoices().get(0).getMessage().getContent();
                 logger.info("ChatGPT response received successfully for user: {}", userId);
-                logger.debug("Raw ChatGPT response content: {}", content);
+                logger.info("Raw ChatGPT response content: {}", content);
                 
                 // Parse ChatGPT response to extract validation data
                 try {
