@@ -218,18 +218,18 @@ public class ChatGptService {
                 
                 ESEMPI DI PARSING CORRETTO CON RIFERIMENTO UTC:
                 - "notificami ogni mercoledì alle 14:39" → CRON=true, cron_expression="39 14 * * 3"
-                - "buttare la pasta domani all'una di pomeriggio" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE+1_GIORNO] 13:00:00"
+                - "buttare la pasta domani all'una di pomeriggio" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE+1_GIORNO] 13:00:00", end_date="[DATA_UTC_CORRENTE+1_GIORNO] 13:30:00"
                 - "controllare se piove ogni giorno alle 8" → CRON=true, CHECK=true, cron_expression="0 8 * * *"
-                - "ricordami di chiamare il 15 febbraio alle 10:30" → SPECIFIC=true, date_time="2025-02-15 10:30:00"
-                - "notificami domani mattina" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE+1_GIORNO] 10:00:00" (DEVI inventare 10:00)
-                - "avvisami stasera" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE] 20:00:00" (DEVI inventare 20:00)
+                - "ricordami di chiamare il 15 febbraio alle 10:30" → SPECIFIC=true, date_time="2026-02-15 10:30:00", end_date="2026-02-15 11:00:00"
+                - "notificami domani mattina ..." → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE+1_GIORNO] 10:00:00" (DEVI inventare 10:00),end_date="[DATA_UTC_CORRENTE+1_GIORNO] 10:30:00"
+                - "avvisami stasera" → SPECIFIC=true, date_time="[DATA_UTC_CORRENTE] 20:00:00" (DEVI inventare 20:00) , date_time="[DATA_UTC_CORRENTE] 20:30:00"
                 - "dimmi quando piove" → CHECK=true, CRON=true, cron_expression="0 10 * * *" (NON inventare orario specifico)
-                - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_UTC_CORRENTE+30_MINUTI]"
-                - "notificami il 21 gennaio sulle notizie" → SPECIFIC=true, date_time="2025-01-21 00:00:00" (PROSSIMO 21 gennaio)
+                - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_UTC_CORRENTE+30_MINUTI]","end_date":"[ORA_UTC_CORRENTE+1_ORA]"
+                - "notificami il 21 gennaio sulle notizie" → SPECIFIC=true, date_time="2026-01-21 00:00:00" (PROSSIMO 21 gennaio), date_time="2026-01-21 00:30:00" (PROSSIMO 21 gennaio)
                  
                 IMPORTANTE: 
                     - Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
-                    - Se SPECIFIC=true → imposta end_date=(date_time + 30 minuti) perchè devi stabilire un intervallo di tempo finale per il controllo
+                    - RICORDATI CHE Se SPECIFIC=true → imposta il campo "when_notify">"end_date"=(date_time + 30 minuti) perchè devi stabilire un intervallo di tempo finale per il controllo
                 
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
