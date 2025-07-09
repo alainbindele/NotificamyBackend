@@ -229,7 +229,7 @@ public class ChatGptService {
                  
                 IMPORTANTE: 
                     - Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
-                    - Se deduci dalla data di notifica che SPECIFIC=true allora imposta anche end_date per quella data 
+                    - Se SPECIFIC=true allora imposta anche end_date per quella data 
                 
                 Format your response as a structured notification plan, ecco il template che dovrai usare:
                 
