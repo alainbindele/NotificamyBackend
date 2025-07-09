@@ -183,12 +183,12 @@ public class ChatGptService {
                 3. Se non viene specificato l'orario → usa 00:00:00 (mezzanotte)
                 4. Se viene specificato un orario generico (mattina/pomeriggio/sera) → usa gli orari standard
                 
-                ESEMPI PRATICI (assumendo data UTC corrente = 2024-07-03):
-                - "notificami il 21 gennaio" → "2025-01-21 00:00:00" (prossimo gennaio)
-                - "ricordami il 15 marzo" → "2025-03-15 00:00:00" (prossimo marzo)
-                - "avvisami il 1 giugno" → "2025-06-01 00:00:00" (prossimo giugno)
-                - "notificami il 21 gennaio alle 9" → "2025-01-21 09:00:00"
-                - "ricordami il 15 marzo mattina" → "2025-03-15 10:00:00"
+                ESEMPI PRATICI (assumendo data UTC corrente = 2025-07-03):
+                - "notificami il 21 gennaio" → "2026-01-21 00:00:00" (prossimo gennaio)
+                - "ricordami il 15 marzo" → "2026-03-15 00:00:00" (prossimo marzo)
+                - "avvisami il 1 giugno" → "2026-06-01 00:00:00" (prossimo giugno)
+                - "notificami il 21 gennaio alle 9" → "2026-01-21 09:00:00"
+                - "ricordami il 15 marzo mattina" → "2026-03-15 10:00:00"
                 
                 CALCOLI TEMPORALI BASATI SU UTC:
                 - "domani" = data UTC corrente + 1 giorno
