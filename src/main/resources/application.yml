@@ -57,7 +57,7 @@ openai:
 # Logging
 logging:
   level:
-    com.notifyme: INFO
+    com.notifyme: DEBUG
     org.springframework.security: INFO
     org.springframework.web: INFO
     org.springframework.security.oauth2: DEBUG

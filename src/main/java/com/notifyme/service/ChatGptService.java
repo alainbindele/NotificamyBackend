@@ -40,18 +40,6 @@ public class ChatGptService {
                 .build();
     }
 
-    public Mono<ChatGptResponse> sendPromptToChatGpt(String prompt) {
-        String policy = buildPolicy();
-        String currentTimestamp = getCurrentUtcTimestamp();
-        ChatGptRequest request = new ChatGptRequest(policy, prompt);
-
-        return webClient.post()
-                .uri(apiUrl)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .bodyValue(buildOpenAiRequest(request, currentTimestamp))
-                .retrieve()
-                .bodyToMono(ChatGptResponse.class);
-    }
 
     public ChatGptResponse sendPromptToChatGptSync(String prompt) {
         try {
