@@ -1,6 +1,8 @@
 # NotifyMe Backend
 
-Spring Boot backend service for the NotifyMe application that processes TUser prompts and integrates with ChatGPT API using Auth0 JWT authentication.
+Spring Boot backend service for the NotifyMe application that processes user prompts and integrates with ChatGPT API using Auth0 JWT authentication.
+
+**Note**: This backend focuses only on prompt validation and query management. Batch processing and notifications are handled by separate microservices.
 
 ## Features
 
@@ -12,6 +14,8 @@ Spring Boot backend service for the NotifyMe application that processes TUser pr
 - **Database Integration**: MySQL database with JPA/Hibernate
 - **Validation**: Comprehensive input validation and sanitization
 - **Logging**: Structured logging for monitoring and debugging
+- **Query Management**: Complete CRUD operations for notification queries
+- **Multi-language Support**: Works with prompts in any natural language
 
 ## Authentication
 
@@ -34,7 +38,7 @@ The application requires the following Auth0 configuration:
 ## API Endpoints
 
 ### POST /api/v1/validate-prompt
-Process a TUser prompt and get AI-generated response.
+Process a user prompt and get AI-generated validation response.
 
 **Headers:**
 ```
@@ -46,7 +50,13 @@ Content-Type: application/json
 ```json
 {
   "prompt": "Notify me about my daily standup meeting",
-  "email": "TUser@example.com"
+  "email": "user@example.com",
+  "channels": ["email", "discord"],
+  "channelConfigs": {
+    "email": "user@example.com",
+    "discord": "https://discord.com/api/webhooks/..."
+  },
+  "timezone": "Europe/Rome"
 }
 ```
 
@@ -55,12 +65,12 @@ Content-Type: application/json
 {
   "success": true,
   "message": "Prompt processed successfully",
-  "data": "AI generated response here"
+  "data": "AI generated validation response here"
 }
 ```
 
 ### GET /api/v1/TUser-info
-Get authenticated TUser information.
+Get authenticated user information.
 
 **Headers:**
 ```
@@ -71,14 +81,50 @@ Authorization: Bearer <jwt-token>
 ```json
 {
   "success": true,
-  "message": "User information retrieved",
+  "message": "User information retrieved", 
   "data": {
-    "id": "auth0|TUser-id",
-    "email": "TUser@example.com",
+    "id": "auth0|user-id",
+    "email": "user@example.com",
     "roles": ["ROLE_USER"]
   }
 }
 ```
+
+### GET /api/v1/queries
+Get all queries for the authenticated user.
+
+**Headers:**
+```
+Authorization: Bearer <jwt-token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Queries retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "prompt": "Notify me every day at 9 AM",
+      "isValid": true,
+      "cron": true,
+      "cronParams": "0 9 * * *",
+      "summaryText": "Daily notification at 9 AM",
+      "createdAt": "2025-01-20T10:00:00"
+    }
+  ]
+}
+```
+
+### GET /api/v1/queries/active
+Get only active queries for the authenticated user.
+
+### GET /api/v1/queries/statistics
+Get query statistics for the authenticated user.
+
+### PUT /api/v1/queries/{queryId}/close
+Close a specific query.
 
 ### GET /api/v1/health
 Health check endpoint (no authentication required).
@@ -102,6 +148,7 @@ Health check endpoint (no authentication required).
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
 - `AUTH0_DOMAIN`: Your Auth0 domain (required)
 - `AUTH0_AUDIENCE`: Your Auth0 API identifier (required)
+- `OPENAI_MODEL`: OpenAI model to use (default: gpt-4o-mini)
 
 ### Application Properties
 
@@ -113,6 +160,7 @@ The application uses YAML configuration in `application.yml`. Key settings:
 - CORS: Enabled for all origins
 - Security: JWT-based authentication with Auth0
 - OAuth2 Resource Server: Configured for JWT validation
+- Scheduling: Disabled (handled by external services)
 
 ## Security Features
 
@@ -131,6 +179,7 @@ The application uses YAML configuration in `application.yml`. Key settings:
 - Jakarta Bean Validation annotations
 - Custom security service for additional checks
 - Automatic sanitization of potentially dangerous characters
+- Multi-channel notification configuration validation
 
 ### CORS Configuration
 - Configured to allow frontend integration
@@ -186,12 +235,12 @@ First, obtain a JWT token from your Auth0 application, then:
 curl -X POST http://localhost:8080/api/v1/validate-prompt \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Remind me to call mom tomorrow at 3pm", "email": "test@example.com"}'
+  -d '{"prompt": "Remind me to call mom tomorrow at 3pm", "email": "test@example.com", "timezone": "Europe/Rome"}'
 ```
 
-### Testing User Info Endpoint
+### Testing Queries Endpoint
 ```bash
-curl -X GET http://localhost:8080/api/v1/TUser-info \
+curl -X GET http://localhost:8080/api/v1/queries \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -212,6 +261,8 @@ src/
 │   │   ├── service/             # Business logic services
 │   │   ├── security/            # Security filters and components
 │   │   ├── config/              # Configuration classes
+│   │   ├── entity/              # JPA entities
+│   │   ├── repository/          # Data repositories
 │   │   └── NotifymeBackendApplication.java
 │   └── resources/
 │       ├── application.yml      # Main configuration
@@ -227,6 +278,7 @@ The backend is designed to work with Auth0-enabled frontends. Make sure to:
 2. Include the JWT token in the `Authorization: Bearer <token>` header for all API requests
 3. Handle token expiration and refresh in your frontend
 4. Implement proper error handling for authentication failures
+5. Use the query management endpoints to display user's notification configurations
 
 ### Frontend Auth0 Integration Example
 
@@ -253,10 +305,25 @@ const response = await fetch('/api/v1/validate-prompt', {
   },
   body: JSON.stringify({
     prompt: 'Your prompt here',
-    email: 'TUser@example.com'
+    email: 'user@example.com',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   })
 });
 ```
+
+## Architecture Notes
+
+This backend service is designed as part of a microservices architecture:
+
+- **This Service**: Handles prompt validation, query management, and user data
+- **Batch Service** (External): Processes scheduled queries and executes notifications
+- **Notification Service** (External): Sends notifications via various channels (email, Discord, Slack, WhatsApp)
+
+The separation allows for:
+- Better scalability and resource allocation
+- Independent deployment and updates
+- Specialized optimization for each concern
+- Fault isolation between services
 
 ## Deployment
 
@@ -269,20 +336,16 @@ For production deployment:
 5. Consider using HTTPS in production
 6. Set up proper monitoring and health checks
 7. Implement proper error handling and alerting
+8. Configure external batch and notification services
+9. Set up service discovery if using microservices
 
-## Migration from API Key Authentication
+## Database Schema
 
-This version replaces the previous API key authentication system with JWT tokens. The following changes were made:
+The application uses the following main tables:
 
-- Removed API key-based authentication filter
-- Removed keychain database table and related entities
-- Added JWT authentication filter with Auth0 integration
-- Updated security configuration for OAuth2 resource server
-- Added TUser information endpoint
-- Updated all API endpoints to work with JWT authentication
+- **users**: User accounts and notification channel configurations
+- **queries**: Notification queries with full ChatGPT validation data
+- **executions**: Historical execution records (managed by external batch service)
+- **notifications**: Sent notification history (managed by external notification service)
 
-If you're migrating from the previous version, you'll need to:
-1. Set up Auth0 account and configure applications/APIs
-2. Update your frontend to use Auth0 authentication
-3. Remove the keychain table from your database (if desired)
-4. Update environment variables to include Auth0 configuration
+See the migration files in `supabase/migrations/` for the complete schema definition.

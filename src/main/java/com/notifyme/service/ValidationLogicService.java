@@ -20,9 +20,6 @@ public class ValidationLogicService {
     
     private static final Logger logger = LoggerFactory.getLogger(ValidationLogicService.class);
     
-    @Autowired
-    private CronExpressionService cronExpressionService;
-    
     /**
      * Applica la logica di validazione e calcolo usando SOLO i dati di ChatGPT
      */
@@ -144,14 +141,7 @@ public class ValidationLogicService {
             String cronExpression = whenNotify.getCronExpression().trim();
             query.setCronParams(cronExpression);
             
-            // Calcola next_execution dal cron
-            try {
-                LocalDateTime nextExecution = cronExpressionService.getNextExecution(cronExpression);
-                query.setNextExecution(nextExecution);
-                logger.debug("Set next_execution from cron '{}': {}", cronExpression, nextExecution);
-            } catch (Exception e) {
-                logger.warn("Failed to calculate next execution from cron '{}': {}", cronExpression, e.getMessage());
-            }
+            logger.debug("Set cron_params: {}", cronExpression);
         }
         
         // 3. Estrai e applica date_time specifico
@@ -199,12 +189,11 @@ public class ValidationLogicService {
         // 5. Fallback per casi senza configurazione temporale esplicita
         if (query.getNextExecution() == null && (query.getCronParams() == null || query.getCronParams().trim().isEmpty())) {
             if (check) {
-                // Per controlli senza orario specifico, usa default giornaliero alle 10:00
+                // Per controlli senza orario specifico, imposta cron default giornaliero
                 query.setCronParams("0 10 * * *");
-                query.setNextExecution(cronExpressionService.getNextExecution("0 10 * * *"));
                 logger.debug("Applied default check schedule: daily at 10:00");
             } else {
-                // Per altri casi, usa un'esecuzione immediata
+                // Per altri casi, imposta next_execution immediato
                 query.setNextExecution(LocalDateTime.now().plusMinutes(1));
                 logger.debug("Applied immediate execution fallback");
             }
@@ -372,10 +361,16 @@ public class ValidationLogicService {
         // Verifica che ci sia almeno una configurazione temporale
         if (query.getNextExecution() == null && 
             (query.getCronParams() == null || query.getCronParams().trim().isEmpty())) {
-            query.setIsValid(false);
-            query.setInvalidReason("Manca la configurazione temporale (next_execution o cron_params)");
-            logger.warn("Final validation failed: no temporal configuration");
-            return;
+            // Per query di tipo CHECK senza configurazione temporale, usa default
+            if (Boolean.TRUE.equals(query.getToCheck())) {
+                query.setCronParams("0 10 * * *");
+                logger.debug("Applied default cron for CHECK query without temporal config");
+            } else {
+                query.setIsValid(false);
+                query.setInvalidReason("Manca la configurazione temporale (next_execution o cron_params)");
+                logger.warn("Final validation failed: no temporal configuration");
+                return;
+            }
         }
         
         // Verifica che next_execution non sia nel passato per query specifiche

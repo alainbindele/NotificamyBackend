@@ -5,7 +5,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
 @Table(name = "queries")
@@ -111,12 +110,6 @@ public class TQuery {
     // Timestamps
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-    
-    @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<TExecution> executions;
-    
-    @OneToMany(mappedBy = "query", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<TNotification> notifications;
     
     public TQuery(TUser user, String prompt) {
         this.user = user;

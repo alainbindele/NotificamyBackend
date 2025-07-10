@@ -72,7 +72,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
   endpoint:
     health:
       show-details: when_authorized
+
+# Disabilita scheduling automatico dato che viene gestito esternamente
+spring:
+  task:
+    scheduling:
+      enabled: false

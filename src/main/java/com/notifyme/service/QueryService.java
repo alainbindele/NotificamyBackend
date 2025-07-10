@@ -4,7 +4,6 @@ import com.notifyme.dto.ChatGptValidationResponse;
 import com.notifyme.entity.TQuery;
 import com.notifyme.entity.TUser;
 import com.notifyme.repository.QueryRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,9 +24,6 @@ public class QueryService {
     
     @Autowired
     private ValidationLogicService validationLogicService;
-    
-    @Autowired
-    private ObjectMapper objectMapper;
     
     /**
      * Crea una query applicando la logica di validazione completa
@@ -85,14 +81,7 @@ public class QueryService {
     public List<TQuery> findActiveQueriesByUser(TUser user) {
         return queryRepository.findActiveQueriesByUser(user);
     }
-    
-    /**
-     * Trova query pronte per l'esecuzione (per Spring Batch)
-     */
-    public List<TQuery> findQueriesReadyForExecution() {
-        return queryRepository.findQueriesReadyForExecutionWithValidityPeriod(LocalDateTime.now());
-    }
-    
+        
     /**
      * Trova query per tipo
      */
