@@ -8,8 +8,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 @Service
 @Transactional
@@ -19,6 +22,9 @@ public class UserService {
     
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private QueryService queryService;
     
     public TUser findOrCreateUser(String email) {
         if (email == null || email.trim().isEmpty()) {
@@ -50,6 +56,55 @@ public class UserService {
         }
         
         return userRepository.save(user);
+    }
+    
+    /**
+     * Aggiorna i canali di notifica dell'utente
+     */
+    public boolean updateUserChannels(TUser user, List<String> channels, Map<String, String> channelConfigs) {
+        if (channels == null || channelConfigs == null) {
+            return false;
+        }
+        
+        boolean updated = false;
+        
+        for (String channel : channels) {
+            String config = channelConfigs.get(channel);
+            if (config != null && !config.trim().isEmpty()) {
+                switch (channel.toLowerCase()) {
+                    case "whatsapp":
+                        if (!config.equals(user.getPhone())) {
+                            user.setPhone(config.trim());
+                            updated = true;
+                            logger.debug("Updated WhatsApp phone for user {}: {}", user.getEmail(), config);
+                        }
+                        break;
+                    case "slack":
+                        if (!config.equals(user.getSlackWebhook())) {
+                            user.setSlackWebhook(config.trim());
+                            updated = true;
+                            logger.debug("Updated Slack webhook for user {}: {}", user.getEmail(), maskWebhook(config));
+                        }
+                        break;
+                    case "discord":
+                        if (!config.equals(user.getDiscordWebhook())) {
+                            user.setDiscordWebhook(config.trim());
+                            updated = true;
+                            logger.debug("Updated Discord webhook for user {}: {}", user.getEmail(), maskWebhook(config));
+                        }
+                        break;
+                    case "email":
+                        // L'email è già gestita separatamente nel profilo utente
+                        logger.debug("Email channel confirmed for user: {}", user.getEmail());
+                        break;
+                    default:
+                        logger.warn("Unknown notification channel: {} for user: {}", channel, user.getEmail());
+                        break;
+                }
+            }
+        }
+        
+        return updated;
     }
     
     private void updateUserChannels(TUser user, List<String> channels, Map<String, String> channelConfigs) {
@@ -96,5 +151,85 @@ public class UserService {
     
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
+    }
+    
+    /**
+     * Salva un utente
+     */
+    public TUser saveUser(TUser user) {
+        return userRepository.save(user);
+    }
+    
+    /**
+     * Elimina un utente e tutti i dati associati
+     */
+    public boolean deleteUser(TUser user) {
+        try {
+            userRepository.delete(user);
+            logger.info("Successfully deleted user: {}", user.getEmail());
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to delete user {}: {}", user.getEmail(), e.getMessage(), e);
+            return false;
+        }
+    }
+    
+    /**
+     * Ottiene statistiche dell'utente
+     */
+    public Map<String, Object> getUserStatistics(TUser user) {
+        Map<String, Object> stats = new HashMap<>();
+        
+        try {
+            // Statistiche base dell'utente
+            stats.put("userId", user.getId());
+            stats.put("email", user.getEmail());
+            stats.put("displayName", user.getDisplayName());
+            stats.put("memberSince", user.getCreatedAt());
+            
+            // Calcola giorni da registrazione
+            if (user.getCreatedAt() != null) {
+                long daysSinceRegistration = ChronoUnit.DAYS.between(user.getCreatedAt(), LocalDateTime.now());
+                stats.put("daysSinceRegistration", daysSinceRegistration);
+            }
+            
+            // Statistiche canali configurati
+            int configuredChannels = 0;
+            if (user.getDiscordWebhook() != null && !user.getDiscordWebhook().trim().isEmpty()) {
+                configuredChannels++;
+            }
+            if (user.getSlackWebhook() != null && !user.getSlackWebhook().trim().isEmpty()) {
+                configuredChannels++;
+            }
+            if (user.getPhone() != null && !user.getPhone().trim().isEmpty()) {
+                configuredChannels++;
+            }
+            configuredChannels++; // Email è sempre configurata
+            
+            stats.put("configuredChannels", configuredChannels);
+            
+            // Statistiche query (se il servizio è disponibile)
+            try {
+                QueryService.QueryStatistics queryStats = queryService.getQueryStatistics(user);
+                stats.put("totalQueries", queryStats.getTotalQueries());
+                stats.put("cronQueries", queryStats.getCronQueries());
+                stats.put("specificQueries", queryStats.getSpecificQueries());
+                stats.put("checkQueries", queryStats.getCheckQueries());
+                
+                // Query attive
+                List<com.notifyme.entity.TQuery> activeQueries = queryService.findActiveQueriesByUser(user);
+                stats.put("activeQueries", activeQueries.size());
+                
+            } catch (Exception e) {
+                logger.warn("Failed to get query statistics for user {}: {}", user.getEmail(), e.getMessage());
+                stats.put("totalQueries", 0);
+                stats.put("activeQueries", 0);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error calculating user statistics for {}: {}", user.getEmail(), e.getMessage(), e);
+        }
+        
+        return stats;
     }
 }

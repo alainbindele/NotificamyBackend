@@ -19,6 +19,9 @@ public class TUser {
     @Column(unique = true, nullable = false)
     private String email;
     
+    @Column(name = "display_name", length = 100)
+    private String displayName;
+    
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     

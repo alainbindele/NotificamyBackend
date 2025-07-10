@@ -72,6 +72,9 @@ Content-Type: application/json
 ### GET /api/v1/TUser-info
 Get authenticated user information.
 
+### GET /api/v1/user/profile
+Get complete user profile with notification channels (masked).
+
 **Headers:**
 ```
 Authorization: Bearer <jwt-token>
@@ -81,11 +84,96 @@ Authorization: Bearer <jwt-token>
 ```json
 {
   "success": true,
-  "message": "User information retrieved", 
+  "message": "User profile retrieved successfully",
   "data": {
-    "id": "auth0|user-id",
+    "id": 1,
     "email": "user@example.com",
-    "roles": ["ROLE_USER"]
+    "displayName": "John Doe",
+    "createdAt": "2025-01-20T10:00:00",
+    "discordWebhook": "https://dis***...xyz",
+    "slackWebhook": "https://hoo***...abc",
+    "phone": "+39***...789"
+  }
+}
+```
+
+### PUT /api/v1/user/profile
+Update user profile (display name and/or email).
+
+**Headers:**
+```
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "displayName": "John Smith",
+  "email": "john.smith@example.com"
+}
+```
+
+### PUT /api/v1/user/notification-channels
+Update notification channel configurations.
+
+**Headers:**
+```
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "discord": "https://discord.com/api/webhooks/...",
+  "slack": "https://hooks.slack.com/services/...",
+  "whatsapp": "+393123456789"
+}
+```
+
+### DELETE /api/v1/user/account
+Delete user account and all associated data.
+
+**Headers:**
+```
+Authorization: Bearer <jwt-token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "User account deleted successfully",
+  "data": "OK"
+}
+```
+
+### GET /api/v1/user/statistics
+Get user statistics and usage information.
+
+**Headers:**
+```
+Authorization: Bearer <jwt-token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "User statistics retrieved successfully",
+  "data": {
+    "userId": 1,
+    "email": "user@example.com",
+    "displayName": "John Doe",
+    "memberSince": "2025-01-20T10:00:00",
+    "daysSinceRegistration": 5,
+    "configuredChannels": 3,
+    "totalQueries": 10,
+    "activeQueries": 7,
+    "cronQueries": 5,
+    "specificQueries": 3,
+    "checkQueries": 2
   }
 }
 ```
