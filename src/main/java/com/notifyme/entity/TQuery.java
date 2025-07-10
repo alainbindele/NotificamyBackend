@@ -18,7 +18,7 @@ public class TQuery {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private TUser user; // Cambiato da TUser a user per Spring Data JPA
+    private TUser user;
     
     @Column(columnDefinition = "TEXT", nullable = false)
     private String prompt;
