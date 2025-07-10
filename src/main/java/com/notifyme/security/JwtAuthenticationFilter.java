@@ -91,15 +91,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         email = decodedJWT.getClaim("https://notificamy.com/email").asString();
                     }
                     if (email == null || email.isEmpty()) {
-                        // Prova altri claim comuni per l'email
                         email = decodedJWT.getClaim("name").asString();
-                        if (email == null || email.isEmpty()) {
-                            email = decodedJWT.getClaim("preferred_username").asString();
-                        }
-                        if (email == null || email.isEmpty()) {
-                            // Fallback finale: usa il subject come email
-                            email = userId;
-                        }
+                    }
+                    if (email == null || email.isEmpty()) {
+                        email = decodedJWT.getClaim("preferred_username").asString();
+                    }
+                    
+                    // Se non troviamo email, non possiamo procedere
+                    if (email == null || email.isEmpty()) {
+                        logger.error("No email found in JWT token for subject: {}", userId);
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\":\"Email not found in token\",\"success\":false}");
+                        return;
                     }
                     
                     // Create authentication token
@@ -112,8 +116,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     
                     // Add user info to request attributes
-                    request.setAttribute("userId", userId);
-                    request.setAttribute("userEmail", email != null ? email : userId);
+                    request.setAttribute("userId", userId);        // JWT subject
+                    request.setAttribute("userEmail", email);      // Email estratta dal JWT
+                    request.setAttribute("authSubject", userId);   // Subject per mapping
                     
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                     logger.info("JWT authentication successful for user: {} ({})", email, userId);

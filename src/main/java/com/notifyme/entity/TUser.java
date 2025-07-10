@@ -34,8 +34,17 @@ public class TUser {
     @Column(name = "whatsapp_phone", length = 30)
     private String phone = "";
     
+    @Column(name = "auth_subject", length = 255)
+    private String authSubject; // JWT subject per riconoscimento futuro
+    
     public TUser(String email) {
         this.email = email;
+        this.createdAt = LocalDateTime.now();
+    }
+    
+    public TUser(String email, String authSubject) {
+        this.email = email;
+        this.authSubject = authSubject;
         this.createdAt = LocalDateTime.now();
     }
     

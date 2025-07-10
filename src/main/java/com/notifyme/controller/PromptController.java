@@ -50,7 +50,7 @@ public class PromptController {
         
         // Get authenticated user information
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication != null ? authentication.getName() : "anonymous";
+        String authSubject = authentication != null ? authentication.getName() : "anonymous";
         String userEmail = (String) httpRequest.getAttribute("userEmail");
         
         // Use email from request if provided, otherwise use the one from JWT
@@ -58,27 +58,27 @@ public class PromptController {
                             ? request.getEmail().trim() 
                             : userEmail;
         
-        logger.info("Received prompt request from authenticated user: {} ({}) with channels: {}", 
-                   emailToSave, userId, request.getChannels());
+        logger.info("Received prompt request from authenticated user: {} (subject: {}) with channels: {}", 
+                   emailToSave, authSubject, request.getChannels());
 
         try {
             // SECURITY: Validate prompt for security
             if (!securityService.isValidPrompt(request.getPrompt())) {
-                logger.warn("Invalid or potentially malicious prompt detected from user {}: {}", userId, request.getPrompt());
+                logger.warn("Invalid or potentially malicious prompt detected from user {}: {}", emailToSave, request.getPrompt());
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("Invalid prompt. Please check your input for security violations."));
             }
 
             // SECURITY: Validate channels and channel configurations
             if (!securityService.areValidChannels(request.getChannels())) {
-                logger.warn("Invalid notification channels detected from user {}: {}", userId, request.getChannels());
+                logger.warn("Invalid notification channels detected from user {}: {}", emailToSave, request.getChannels());
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("Invalid notification channels specified."));
             }
 
             if (!securityService.validateChannelConfigs(request.getChannels(), request.getChannelConfigs())) {
                 logger.warn("Invalid or potentially malicious channel configurations detected from user {}: {}", 
-                           userId, request.getChannels());
+                           emailToSave, request.getChannels());
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("Invalid channel configurations. Please check webhook URLs, phone numbers, and email addresses."));
             }
@@ -87,18 +87,22 @@ public class PromptController {
             String sanitizedPrompt = securityService.sanitizeInput(request.getPrompt());
             var sanitizedChannelConfigs = securityService.sanitizeChannelConfigs(request.getChannelConfigs());
             
-            logger.info("Processing sanitized prompt for user {}: {}", userId, sanitizedPrompt);
+            logger.info("Processing sanitized prompt for user {}: {}", emailToSave, sanitizedPrompt);
 
-            // Save or find user in database with notification channels
+            // Save or find user in database with notification channels usando email + subject
             TUser user = null;
             if (emailToSave != null && !emailToSave.isEmpty()) {
-                user = userService.findOrCreateUserWithChannels(
-                    emailToSave, 
-                    request.getChannels(), 
-                    sanitizedChannelConfigs
-                );
-                logger.info("User found/created with ID: {} and email: {} with notification channels updated", 
-                           user.getId(), user.getEmail());
+                // Prima trova/crea l'utente usando email e subject
+                user = userService.findOrCreateUserByEmailAndSubject(emailToSave, authSubject);
+                
+                // Poi aggiorna i canali se forniti
+                if (request.getChannels() != null && !request.getChannels().isEmpty()) {
+                    userService.updateUserChannels(user, request.getChannels(), sanitizedChannelConfigs);
+                    user = userService.saveUser(user);
+                }
+                
+                logger.info("User found/created with ID: {}, email: {} and subject: {} with notification channels updated", 
+                           user.getId(), user.getEmail(), user.getAuthSubject());
             }
 
             // Send to ChatGPT synchronously
@@ -106,7 +110,7 @@ public class PromptController {
             
             if (chatGptResponse != null && chatGptResponse.getChoices() != null && !chatGptResponse.getChoices().isEmpty()) {
                 String content = chatGptResponse.getChoices().get(0).getMessage().getContent();
-                logger.info("ChatGPT response received successfully for user: {}", userId);
+                logger.info("ChatGPT response received successfully for user: {}", emailToSave);
                 logger.info("Raw ChatGPT response content: {}", content);
                 
                 // Parse ChatGPT response to extract validation data
@@ -122,7 +126,7 @@ public class PromptController {
                         throw new Exception("Parsed response is null");
                     }
                     
-                    logger.info("Successfully parsed ChatGPT validation response for user: {}", userId);
+                    logger.info("Successfully parsed ChatGPT validation response for user: {}", emailToSave);
                     
                     // Save query to database with complete validation data
                     if (user != null) {
@@ -138,7 +142,7 @@ public class PromptController {
                             }
                         }
                         
-                        logger.info("Query saved successfully for user: {} with full ChatGPT validation data", userId);
+                        logger.info("Query saved successfully for user: {} with full ChatGPT validation data", emailToSave);
                         
                         // MIGLIORAMENTO: Se la query non è valida, restituisci errore al frontend
                         if (!Boolean.TRUE.equals(savedQuery.getIsValid())) {
@@ -146,7 +150,7 @@ public class PromptController {
                                                  savedQuery.getInvalidReason() : 
                                                  "Il prompt non è valido secondo le policy di sistema";
                             
-                            logger.warn("Query marked as invalid for user {}: {}", userId, errorMessage);
+                            logger.warn("Query marked as invalid for user {}: {}", emailToSave, errorMessage);
                             return ResponseEntity.badRequest()
                                     .body(ApiResponse.error(errorMessage));
                         }
@@ -155,7 +159,7 @@ public class PromptController {
                     // Log validation results for monitoring
                     if (validationResponse.getValidity() != null) {
                         logger.info("Validation results for user {}: valid={}, cron={}, specific={}, check={}, reason={}", 
-                                   userId, 
+                                   emailToSave, 
                                    validationResponse.getValidity().getValidPrompt(),
                                    validationResponse.getWhenNotify() != null && validationResponse.getWhenNotify().getTimeType() != null ?
                                        validationResponse.getWhenNotify().getTimeType().getCron() : false,
@@ -167,14 +171,14 @@ public class PromptController {
                     }
                     
                 } catch (Exception parseException) {
-                    logger.error("Failed to parse ChatGPT validation response: {}", parseException.getMessage());
+                    logger.error("Failed to parse ChatGPT validation response for user {}: {}", emailToSave, parseException.getMessage());
                     logger.error("Raw response that failed to parse: {}", content);
                     logger.error("Parse exception details: ", parseException);
                     
                     // Save query anyway, but mark as invalid due to parsing error
                     if (user != null) {
                         var fallbackQuery = queryService.createFallbackQuery(user, sanitizedPrompt, request.getTimezone());
-                        logger.info("Fallback query saved for user: {}", userId);
+                        logger.info("Fallback query saved for user: {}", emailToSave);
                         
                         // Restituisci errore al frontend anche per fallback query
                         return ResponseEntity.badRequest()
@@ -188,13 +192,13 @@ public class PromptController {
                 // Return simple string response like commit 96e0d594
                 return ResponseEntity.ok(ApiResponse.success("Prompt processed successfully", content));
             } else {
-                logger.error("Empty or invalid response from ChatGPT for user: {}", userId);
+                logger.error("Empty or invalid response from ChatGPT for user: {}", emailToSave);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(ApiResponse.<String>error("No response from AI service"));
             }
                             
         } catch (Exception e) {
-            logger.error("Error processing prompt for user {}: ", userId, e);
+            logger.error("Error processing prompt for user {}: ", emailToSave, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.<String>error("Error processing your request: " + e.getMessage()));
         }

@@ -26,6 +26,50 @@ public class UserService {
     @Autowired
     private QueryService queryService;
     
+    /**
+     * Trova o crea utente usando email come chiave primaria e subject come token di riconoscimento
+     */
+    public TUser findOrCreateUserByEmailAndSubject(String email, String authSubject) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email cannot be null or empty");
+        }
+        
+        if (authSubject == null || authSubject.trim().isEmpty()) {
+            throw new IllegalArgumentException("Auth subject cannot be null or empty");
+        }
+        
+        // 1. Prima prova a trovare per email (chiave primaria)
+        Optional<TUser> userByEmail = userRepository.findByEmail(email);
+        if (userByEmail.isPresent()) {
+            TUser user = userByEmail.get();
+            // Aggiorna il subject se è cambiato o non era presente
+            if (user.getAuthSubject() == null || !user.getAuthSubject().equals(authSubject)) {
+                user.setAuthSubject(authSubject);
+                user = userRepository.save(user);
+                logger.info("Updated auth subject for existing user: {}", email);
+            }
+            return user;
+        }
+        
+        // 2. Se non trovato per email, prova per subject (per utenti esistenti con vecchio sistema)
+        Optional<TUser> userBySubject = userRepository.findByAuthSubject(authSubject);
+        if (userBySubject.isPresent()) {
+            TUser user = userBySubject.get();
+            // Aggiorna l'email se è cambiata
+            if (!user.getEmail().equals(email)) {
+                user.setEmail(email);
+                user = userRepository.save(user);
+                logger.info("Updated email for existing user with subject: {} -> {}", authSubject, email);
+            }
+            return user;
+        }
+        
+        // 3. Crea nuovo utente con email e subject
+        logger.info("Creating new user with email: {} and subject: {}", email, authSubject);
+        TUser newUser = new TUser(email, authSubject);
+        return userRepository.save(newUser);
+    }
+    
     public TUser findOrCreateUser(String email) {
         if (email == null || email.trim().isEmpty()) {
             throw new IllegalArgumentException("Email cannot be null or empty");
