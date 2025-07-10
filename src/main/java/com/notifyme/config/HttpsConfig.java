@@ -3,7 +3,6 @@ package com.notifyme.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 
 @Configuration
 @Profile("!dev") // Non applicare in sviluppo locale
@@ -16,14 +15,10 @@ public class HttpsConfig {
                    .requiresSecure()
         );
         
-        // Headers di sicurezza base
+        // Headers di sicurezza essenziali
         http.headers(headers -> headers
-            .httpStrictTransportSecurity(hsts -> hsts
-                .maxAgeInSeconds(31536000)
-                .includeSubdomains(true)
-            )
-            .frameOptions().deny()
-            .contentTypeOptions().and()
+            .frameOptions(frameOptions -> frameOptions.deny())
+            .contentTypeOptions(contentType -> {})
         );
     }
 }
