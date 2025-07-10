@@ -37,7 +37,7 @@ public class QueryController {
     public ResponseEntity<ApiResponse<List<TQuery>>> getUserQueries(HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -63,7 +63,7 @@ public class QueryController {
     public ResponseEntity<ApiResponse<List<TQuery>>> getActiveQueries(HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -90,7 +90,7 @@ public class QueryController {
                                                                      HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -130,7 +130,7 @@ public class QueryController {
     public ResponseEntity<ApiResponse<QueryService.QueryStatistics>> getQueryStatistics(HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -160,7 +160,7 @@ public class QueryController {
                                                          HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -192,7 +192,7 @@ public class QueryController {
                                                            HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()

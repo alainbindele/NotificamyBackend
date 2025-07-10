@@ -91,7 +91,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         email = decodedJWT.getClaim("https://notificamy.com/email").asString();
                     }
                     if (email == null || email.isEmpty()) {
+                        // Prova altri claim comuni per l'email
                         email = decodedJWT.getClaim("name").asString();
+                        if (email == null || email.isEmpty()) {
+                            email = decodedJWT.getClaim("preferred_username").asString();
+                        }
+                        if (email == null || email.isEmpty()) {
+                            // Fallback finale: usa il subject come email
+                            email = userId;
+                        }
                     }
                     
                     // Create authentication token

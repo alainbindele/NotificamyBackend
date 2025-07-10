@@ -37,7 +37,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserProfileResponse>> getUserProfile(HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -75,7 +75,7 @@ public class UserController {
             HttpServletRequest request) {
         try {
             String currentUserEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(currentUserEmail);
+            TUser user = userService.findOrCreateUser(currentUserEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -159,7 +159,7 @@ public class UserController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String userId = authentication != null ? authentication.getName() : "unknown";
             
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -193,7 +193,7 @@ public class UserController {
             HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
@@ -256,7 +256,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getUserStatistics(HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
-            TUser user = userService.findByEmail(userEmail);
+            TUser user = userService.findOrCreateUser(userEmail);
             
             if (user == null) {
                 return ResponseEntity.badRequest()
