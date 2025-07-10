@@ -46,20 +46,12 @@ public class ValidationLogicService {
         // 3. Estrai e applica i dati temporali SOLO dalla risposta ChatGPT
         extractAndApplyTemporalDataFromChatGPT(query, validationResponse, userTimezone);
         
-        // 4. Valida presenza di contenuto/evento
-        if (!hasContentOrEvent(prompt)) {
-            logger.warn("Query rejected: no content or event specified");
-            query.setIsValid(false);
-            query.setInvalidReason("Manca la specifica di cosa notificare o quale evento controllare");
-            return query;
-        }
-        
-        // 5. Applica valutazione preliminare dell'intervallo di validità
+        // 4. Applica valutazione preliminare dell'intervallo di validità
         if (!applyPreliminaryValidation(query, validationResponse)) {
             return query; // Query chiusa o invalidata
         }
         
-        // 6. Valida la configurazione finale
+        // 5. Valida la configurazione finale
         validateFinalConfiguration(query);
         
         logger.info("Validation logic applied - Query valid: {}, cron: {}, specific: {}, check: {}, next_execution: {}, cron_params: {}", 
@@ -301,37 +293,6 @@ public class ValidationLogicService {
             logger.error("Failed to parse datetime '{}': {}", dateTimeStr, e.getMessage());
             throw e;
         }
-    }
-    
-    /**
-     * Verifica se il prompt contiene [qualcosa] o [evento]
-     */
-    private boolean hasContentOrEvent(String prompt) {
-        // Il prompt deve contenere almeno una di queste cose:
-        // 1. Un'azione da ricordare (buttare la pasta, chiamare, etc.)
-        // 2. Un evento da controllare (se bitcoin scende, se arriva email, etc.)
-        // 3. Contenuto informativo (notizie, aggiornamenti, etc.)
-        
-        String lowerPrompt = prompt.toLowerCase();
-        
-        // Azioni/contenuti
-        if (lowerPrompt.contains("buttare") || lowerPrompt.contains("chiamare") || 
-            lowerPrompt.contains("ricorda") || lowerPrompt.contains("remind") ||
-            lowerPrompt.contains("notizie") || lowerPrompt.contains("news") ||
-            lowerPrompt.contains("aggiornament") || lowerPrompt.contains("update") ||
-            lowerPrompt.contains("promemoria") || lowerPrompt.contains("notifica")) {
-            return true;
-        }
-        
-        // Eventi condizionali
-        if (lowerPrompt.contains("se ") || lowerPrompt.contains("if ") ||
-            lowerPrompt.contains("quando ") || lowerPrompt.contains("when ") ||
-            lowerPrompt.contains("scende") || lowerPrompt.contains("sale") ||
-            lowerPrompt.contains("cambia") || lowerPrompt.contains("raggiunge")) {
-            return true;
-        }
-        
-        return false;
     }
     
     /**
