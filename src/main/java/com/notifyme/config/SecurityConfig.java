@@ -105,27 +105,20 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Configurazione CORS - SOLO HTTPS in produzione
+        // Configurazione CORS - HTTP e HTTPS permessi
         configuration.setAllowedOrigins(List.of(
             "https://notificamy.com",
             "https://www.notificamy.com",
-            "http://localhost:3000", // Solo in dev
-            "http://localhost:5173"  // Solo in dev
+            "http://notificamy.com",     // HTTP permesso
+            "http://www.notificamy.com", // HTTP permesso
+            "http://localhost:3000",     // Dev locale
+            "http://localhost:5173"      // Dev locale
         ));
         
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
-        
-        // In produzione, rimuovi origini HTTP
-        String activeProfile = System.getProperty("spring.profiles.active", "dev");
-        if ("prod".equals(activeProfile)) {
-            configuration.setAllowedOrigins(List.of(
-                "https://notificamy.com",
-                "https://www.notificamy.com"
-            ));
-        }
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
