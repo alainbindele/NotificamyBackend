@@ -261,10 +261,10 @@ public class ChatGptService {
                 - "controllare se piove ogni giorno alle 8" → CRON=true, CHECK=true, cron_expression="0 8 * * *"
                 - "ricordami di chiamare il 15 febbraio alle 10:30" → SPECIFIC=true, date_time="2026-02-15 10:30:00 Europe/Rome", end_date="2026-02-15 11:00:00 Europe/Rome"
                 - "notificami domani mattina ..." → SPECIFIC=true, date_time="[DATA_DOMANI] 10:00:00 Asia/Tokyo", end_date="[DATA_DOMANI] 10:30:00 Asia/Tokyo"
-                - "avvisami stasera" → SPECIFIC=true, date_time="[DATA_OGGI] 20:00:00 America/New_York", end_date="[DATA_OGGI] 20:30:00 America/New_York"
+                - "avvisami stasera..." → SPECIFIC=true, date_time="[DATA_OGGI] 20:00:00 America/New_York", end_date="[DATA_OGGI] 20:30:00 America/New_York"
                 - "dimmi quando piove" → CHECK=true, CRON=true, cron_expression="0 10 * * *" (NON inventare orario specifico)
-                - "tra 30 minuti ricordami di chiamare" → SPECIFIC=true, date_time="[ORA_CORRENTE+30_MIN] [TIMEZONE_UTENTE]", end_date="[ORA_CORRENTE+1_ORA] [TIMEZONE_UTENTE]"
-                - "notificami il 21 gennaio sulle notizie" → SPECIFIC=true, date_time="2026-01-21 00:00:00 [TIMEZONE_UTENTE]", end_date="2026-01-21 00:30:00 [TIMEZONE_UTENTE]"
+                - "tra 30 minuti ricordami di chiamare..." → SPECIFIC=true, date_time="[ORA_CORRENTE+30_MIN] [TIMEZONE_UTENTE]", end_date="[ORA_CORRENTE+1_ORA] [TIMEZONE_UTENTE]"
+                - "notificami il 21 gennaio sulle notizie..." → SPECIFIC=true, date_time="2026-01-21 00:00:00 [TIMEZONE_UTENTE]", end_date="2026-01-21 00:30:00 [TIMEZONE_UTENTE]"
                  
                 IMPORTANTE: 
                     - Rispondi SEMPRE E SOLO con un JSON valido nel formato specificato. Non aggiungere testo prima o dopo il JSON.
@@ -327,10 +327,12 @@ public class ChatGptService {
                  cron=1, specific=0, check=0 → Simply recurrent
                  cron=1, specific=1, check=0 → NOT_VALID
                  cron=0, specific=1, check=0 → Simply in a certain date/datetime
-                 cron=0, specific=0, check=1 → Check condition (default daily at 10AM)
-                 cron=1, specific=0, check=1 → Check condition with specified frequency
-                 cron=1, specific=1, check=1 → Check condition at specific date with frequency
-                 cron=0, specific=1, check=1 → Check condition at specific date/datetime
+                 cron=0, specific=0, check=1 → Check "condition" (default daily at 10AM)
+                 cron=1, specific=0, check=1 → Check "condition" with specified frequency
+                 cron=1, specific=1, check=1 → Check "condition" at specific date with frequency
+                 cron=0, specific=1, check=1 → Check "condition" at specific date/datetime
+                 per "condition" si intende che nel prompt compaiono espressioni come "notificami SE piove" oppure "quando piove" oppure "nel caso in cui" etc.
+                 se c'è scritto "notificami sul prezzo di bitcoin" oppure "notificami sul meteo a roma" etc, non è una "condition" ed il campo check va impostato a false
                 """;
     }
 
