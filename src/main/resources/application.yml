@@ -41,17 +41,21 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
 
+  # Task scheduling - disabilitato
+  task:
+    scheduling:
+      enabled: false
+
 # Auth0 Configuration
 auth0:
   domain: ${AUTH0_DOMAIN}
   audience: ${AUTH0_AUDIENCE}
 
-# OpenAI Configuration - CORRETTA per evitare errori 400
+# OpenAI Configuration
 openai:
   api:
     key: ${OPENAI_API_KEY}
     url: https://api.openai.com/v1/chat/completions
-  # IMPORTANTE: Usa gpt-4o-mini se gpt-4o non è disponibile nel tuo account
   model: ${OPENAI_MODEL:gpt-4o-mini}
 
 # Logging
@@ -76,9 +80,3 @@ management:
   endpoint:
     health:
       show-details: when_authorized
-
-# Disabilita scheduling automatico dato che viene gestito esternamente
-spring:
-  task:
-    scheduling:
-      enabled: false
