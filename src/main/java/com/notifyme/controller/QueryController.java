@@ -1,6 +1,7 @@
 package com.notifyme.controller;
 
 import com.notifyme.dto.ApiResponse;
+import com.notifyme.dto.QueryResponse;
 import com.notifyme.entity.TQuery;
 import com.notifyme.entity.TUser;
 import com.notifyme.service.QueryService;
@@ -15,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/queries")
@@ -34,7 +36,7 @@ public class QueryController {
      * Ottiene tutte le query dell'utente autenticato
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<TQuery>>> getUserQueries(HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<List<QueryResponse>>> getUserQueries(HttpServletRequest request) {
         try {
             // Estrai informazioni utente dalla richiesta (impostate dal JwtAuthenticationFilter)
             String userEmail = (String) request.getAttribute("userEmail");
@@ -56,8 +58,13 @@ public class QueryController {
             
             List<TQuery> queries = queryService.findByUser(user);
             
-            logger.info("Retrieved {} queries for user: {}", queries.size(), userEmail);
-            return ResponseEntity.ok(ApiResponse.success("Queries retrieved successfully", queries));
+            // Converti le entità in DTO per evitare problemi di lazy loading
+            List<QueryResponse> queryResponses = queries.stream()
+                    .map(QueryResponse::fromEntity)
+                    .collect(Collectors.toList());
+            
+            logger.info("Retrieved {} queries for user: {}", queryResponses.size(), userEmail);
+            return ResponseEntity.ok(ApiResponse.success("Queries retrieved successfully", queryResponses));
             
         } catch (Exception e) {
             logger.error("Error retrieving user queries: {}", e.getMessage(), e);
@@ -70,7 +77,7 @@ public class QueryController {
      * Ottiene solo le query attive dell'utente
      */
     @GetMapping("/active")
-    public ResponseEntity<ApiResponse<List<TQuery>>> getActiveQueries(HttpServletRequest request) {
+    public ResponseEntity<ApiResponse<List<QueryResponse>>> getActiveQueries(HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
@@ -91,8 +98,13 @@ public class QueryController {
             
             List<TQuery> activeQueries = queryService.findActiveQueriesByUser(user);
             
-            logger.info("Retrieved {} active queries for user: {}", activeQueries.size(), userEmail);
-            return ResponseEntity.ok(ApiResponse.success("Active queries retrieved successfully", activeQueries));
+            // Converti le entità in DTO
+            List<QueryResponse> queryResponses = activeQueries.stream()
+                    .map(QueryResponse::fromEntity)
+                    .collect(Collectors.toList());
+            
+            logger.info("Retrieved {} active queries for user: {}", queryResponses.size(), userEmail);
+            return ResponseEntity.ok(ApiResponse.success("Active queries retrieved successfully", queryResponses));
             
         } catch (Exception e) {
             logger.error("Error retrieving active queries: {}", e.getMessage(), e);
@@ -105,7 +117,7 @@ public class QueryController {
      * Ottiene query per tipo
      */
     @GetMapping("/type/{type}")
-    public ResponseEntity<ApiResponse<List<TQuery>>> getQueriesByType(@PathVariable String type, 
+    public ResponseEntity<ApiResponse<List<QueryResponse>>> getQueriesByType(@PathVariable String type, 
                                                                      HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
@@ -141,8 +153,13 @@ public class QueryController {
                             .body(ApiResponse.error("Invalid query type. Use: cron, specific, or check"));
             }
             
-            logger.info("Retrieved {} {} queries for user: {}", queries.size(), type, userEmail);
-            return ResponseEntity.ok(ApiResponse.success(type + " queries retrieved successfully", queries));
+            // Converti le entità in DTO
+            List<QueryResponse> queryResponses = queries.stream()
+                    .map(QueryResponse::fromEntity)
+                    .collect(Collectors.toList());
+            
+            logger.info("Retrieved {} {} queries for user: {}", queryResponses.size(), type, userEmail);
+            return ResponseEntity.ok(ApiResponse.success(type + " queries retrieved successfully", queryResponses));
             
         } catch (Exception e) {
             logger.error("Error retrieving {} queries: {}", type, e.getMessage(), e);
@@ -234,7 +251,7 @@ public class QueryController {
      * Ottiene una query specifica per ID
      */
     @GetMapping("/{queryId}")
-    public ResponseEntity<ApiResponse<TQuery>> getQueryById(@PathVariable Long queryId, 
+    public ResponseEntity<ApiResponse<QueryResponse>> getQueryById(@PathVariable Long queryId, 
                                                            HttpServletRequest request) {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
@@ -265,8 +282,11 @@ public class QueryController {
                 return ResponseEntity.notFound().build();
             }
             
+            // Converti l'entità in DTO
+            QueryResponse queryResponse = QueryResponse.fromEntity(query);
+            
             logger.info("Retrieved query {} for user: {}", queryId, userEmail);
-            return ResponseEntity.ok(ApiResponse.success("Query retrieved successfully", query));
+            return ResponseEntity.ok(ApiResponse.success("Query retrieved successfully", queryResponse));
             
         } catch (Exception e) {
             logger.error("Error retrieving query {}: {}", queryId, e.getMessage(), e);

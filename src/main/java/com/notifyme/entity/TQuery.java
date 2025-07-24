@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Table(name = "queries")
 @Data
 @NoArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class TQuery {
     
     @Id
@@ -18,6 +19,7 @@ public class TQuery {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     private TUser user;
     
     @Column(columnDefinition = "TEXT", nullable = false)
