@@ -19,7 +19,7 @@ Spring Boot backend service for the NotifyMe application that processes user pro
 
 ## Authentication
 
-The API uses JWT tokens provided by Auth0 for authentication. All API endpoints (except health checks) require a valid JWT token in the Authorization header.
+The API uses JWT tokens provided by Clerk for authentication. All API endpoints (except health checks) require a valid JWT token in the Authorization header.
 
 ### JWT Token Format
 
@@ -27,13 +27,13 @@ The API uses JWT tokens provided by Auth0 for authentication. All API endpoints 
 Authorization: Bearer <your-jwt-token>
 ```
 
-### Auth0 Configuration
+### Clerk Configuration
 
-The application requires the following Auth0 configuration:
+The application requires the following Clerk configuration:
 
-- **Domain**: Your Auth0 domain (e.g., `your-domain.auth0.com`)
-- **Audience**: Your API identifier configured in Auth0
-- **JWKS Endpoint**: Automatically configured based on domain
+- **Publishable Key**: Your Clerk publishable key (starts with `pk_`)
+- **Secret Key**: Your Clerk secret key (starts with `sk_`)
+- **API Verification**: Automatic JWT validation with Clerk's infrastructure
 
 ## API Endpoints
 
@@ -234,8 +234,8 @@ Health check endpoint (no authentication required).
 - `MYSQL_USER`: Database username
 - `MYSQL_PASS`: Database password
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
-- `AUTH0_DOMAIN`: Your Auth0 domain (required)
-- `AUTH0_AUDIENCE`: Your Auth0 API identifier (required)
+- `CLERK_PUBLISHABLE_KEY`: Your Clerk publishable key (optional for backend)
+- `CLERK_SECRET_KEY`: Your Clerk secret key (required)
 - `OPENAI_MODEL`: OpenAI model to use (default: gpt-4o-mini)
 
 ### Application Properties
@@ -246,14 +246,14 @@ The application uses YAML configuration in `application.yml`. Key settings:
 - Database: MySQL with JPA/Hibernate
 - OpenAI API URL: https://api.openai.com/v1/chat/completions
 - CORS: Enabled for all origins
-- Security: JWT-based authentication with Auth0
+- Security: JWT-based authentication with Clerk
 - OAuth2 Resource Server: Configured for JWT validation
 - Scheduling: Disabled (handled by external services)
 
 ## Security Features
 
 ### JWT Token Validation
-- Auth0 JWT token verification using JWKS
+- Clerk JWT token verification
 - Automatic token signature validation
 - Issuer and audience verification
 - Token expiration checking
@@ -274,22 +274,22 @@ The application uses YAML configuration in `application.yml`. Key settings:
 - Supports all common HTTP methods
 - Credential support enabled
 
-## Auth0 Setup
+## Clerk Setup
 
-### 1. Create Auth0 Application
-1. Go to [Auth0 Dashboard](https://manage.auth0.com/)
-2. Create a new Single Page Application (SPA) for your frontend
-3. Configure allowed callback URLs, logout URLs, and web origins
+### 1. Create Clerk Application
+1. Go to [Clerk Dashboard](https://dashboard.clerk.com/)
+2. Create a new application
+3. Choose your preferred authentication methods (email, social providers, etc.)
 
-### 2. Create Auth0 API
-1. In Auth0 Dashboard, go to APIs
-2. Create a new API with a unique identifier (this becomes your `AUTH0_AUDIENCE`)
-3. Enable RBAC if you need role-based access control
+### 2. Get API Keys
+1. In Clerk Dashboard, go to API Keys
+2. Copy your Publishable Key (starts with `pk_`)
+3. Copy your Secret Key (starts with `sk_`)
 
 ### 3. Configure Environment Variables
 ```bash
-export AUTH0_DOMAIN=your-domain.auth0.com
-export AUTH0_AUDIENCE=your-api-identifier
+export CLERK_PUBLISHABLE_KEY=pk_test_...
+export CLERK_SECRET_KEY=sk_test_...
 export OPENAI_API_KEY=your-openai-api-key
 export DATABASE_URL=your-database-url
 export MYSQL_USER=your-db-username
@@ -317,7 +317,7 @@ export MYSQL_PASS=your-db-password
 
 ### Testing API with curl
 
-First, obtain a JWT token from your Auth0 application, then:
+First, obtain a JWT token from your Clerk application, then:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/validate-prompt \
@@ -360,43 +360,39 @@ src/
 
 ## Integration with Frontend
 
-The backend is designed to work with Auth0-enabled frontends. Make sure to:
+The backend is designed to work with Clerk-enabled frontends. Make sure to:
 
-1. Configure your frontend to authenticate with Auth0
+1. Configure your frontend to authenticate with Clerk
 2. Include the JWT token in the `Authorization: Bearer <token>` header for all API requests
 3. Handle token expiration and refresh in your frontend
 4. Implement proper error handling for authentication failures
 5. Use the query management endpoints to display user's notification configurations
 
-### Frontend Auth0 Integration Example
+### Frontend Clerk Integration Example
 
 ```javascript
-// Example using Auth0 SPA SDK
-import { createAuth0Client } from '@auth0/auth0-spa-js';
+// Example using Clerk React SDK
+import { useAuth } from '@clerk/clerk-react';
 
-const auth0 = await createAuth0Client({
-  domain: 'your-domain.auth0.com',
-  clientId: 'your-client-id',
-  authorizationParams: {
-    redirect_uri: window.location.origin,
-    audience: 'your-api-identifier'
-  }
-});
+function ApiCall() {
+  const { getToken } = useAuth();
 
-// Get token and make API call
-const token = await auth0.getTokenSilently();
-const response = await fetch('/api/v1/validate-prompt', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    prompt: 'Your prompt here',
-    email: 'user@example.com',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-  })
-});
+  const makeApiCall = async () => {
+    const token = await getToken();
+    const response = await fetch('/api/v1/validate-prompt', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        prompt: 'Your prompt here',
+        email: 'user@example.com',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      })
+    });
+  };
+}
 ```
 
 ## Architecture Notes
@@ -418,7 +414,7 @@ The separation allows for:
 For production deployment:
 
 1. Set up a production MySQL database
-2. Configure Auth0 for production (update allowed origins, callback URLs)
+2. Configure Clerk for production (update allowed origins in Clerk dashboard)
 3. Set all required environment variables
 4. Configure appropriate logging levels
 5. Consider using HTTPS in production

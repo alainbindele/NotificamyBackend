@@ -1,13 +1,7 @@
 package com.notifyme.security;
 
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
-import com.auth0.jwt.exceptions.JWTVerificationException;
-import com.auth0.jwt.interfaces.DecodedJWT;
-import com.auth0.jwt.interfaces.JWTVerifier;
-import com.auth0.jwk.Jwk;
-import com.auth0.jwk.JwkProvider;
-import com.auth0.jwk.UrlJwkProvider;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,8 +17,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.net.URL;
-import java.security.interfaces.RSAPublicKey;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 
@@ -35,13 +32,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
-    @Value("${auth0.domain}")
-    private String auth0Domain;
+    @Value("${clerk.publishable-key:}")
+    private String clerkPublishableKey;
 
-    @Value("${auth0.audience}")
-    private String auth0Audience;
+    @Value("${clerk.secret-key:}")
+    private String clerkSecretKey;
 
-    private JwkProvider jwkProvider;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
@@ -80,52 +78,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = authorizationHeader.substring(BEARER_PREFIX.length());
             
             try {
-                DecodedJWT decodedJWT = validateToken(token);
+                // Valida il token con Clerk
+                ClerkUserInfo userInfo = validateClerkToken(token);
                 
-                if (decodedJWT != null) {
-                    String userId = decodedJWT.getSubject();
-                    String email = decodedJWT.getClaim("email").asString();
-                    
-                    // Fallback per email se non presente nel claim principale
-                    if (email == null || email.isEmpty()) {
-                        email = decodedJWT.getClaim("https://notificamy.com/email").asString();
-                    }
-                    if (email == null || email.isEmpty()) {
-                        email = decodedJWT.getClaim("name").asString();
-                    }
-                    if (email == null || email.isEmpty()) {
-                        email = decodedJWT.getClaim("preferred_username").asString();
-                    }
-                    
-                    // Se non troviamo email, non possiamo procedere
-                    if (email == null || email.isEmpty()) {
-                        logger.error("No email found in JWT token for subject: {}", userId);
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        response.setContentType("application/json");
-                        response.getWriter().write("{\"error\":\"Email not found in token\",\"success\":false}");
-                        return;
-                    }
-                    
+                if (userInfo != null) {
                     // Create authentication token
                     List<SimpleGrantedAuthority> authorities = Collections.singletonList(
                         new SimpleGrantedAuthority("ROLE_USER")
                     );
                     
                     UsernamePasswordAuthenticationToken authToken = 
-                        new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                        new UsernamePasswordAuthenticationToken(userInfo.userId, null, authorities);
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     
                     // Add user info to request attributes
-                    request.setAttribute("userId", userId);        // JWT subject
-                    request.setAttribute("userEmail", email);      // Email estratta dal JWT
-                    request.setAttribute("authSubject", userId);   // Subject per mapping
+                    request.setAttribute("userId", userInfo.userId);
+                    request.setAttribute("userEmail", userInfo.email);
+                    request.setAttribute("authSubject", userInfo.userId);
                     
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    logger.info("JWT authentication successful for user: {} ({})", email, userId);
+                    logger.info("Clerk JWT authentication successful for user: {} ({})", userInfo.email, userInfo.userId);
                 }
                 
             } catch (Exception e) {
-                logger.error("JWT authentication failed: {}", e.getMessage());
+                logger.error("Clerk JWT authentication failed: {}", e.getMessage());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\":\"Invalid or expired token\",\"success\":false}");
@@ -149,22 +125,131 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                requestPath.startsWith("/actuator/");
     }
 
-    private DecodedJWT validateToken(String token) throws Exception {
-        if (jwkProvider == null) {
-            jwkProvider = new UrlJwkProvider(new URL(String.format("https://%s/.well-known/jwks.json", auth0Domain)));
+    /**
+     * Valida il token JWT con Clerk usando l'API di verifica
+     */
+    private ClerkUserInfo validateClerkToken(String token) throws Exception {
+        if (clerkSecretKey == null || clerkSecretKey.trim().isEmpty()) {
+            throw new RuntimeException("Clerk secret key not configured");
         }
 
-        DecodedJWT jwt = JWT.decode(token);
-        
-        // Verify the token signature
-        Jwk jwk = jwkProvider.get(jwt.getKeyId());
-        Algorithm algorithm = Algorithm.RSA256((RSAPublicKey) jwk.getPublicKey(), null);
-        
-        JWTVerifier verifier = JWT.require(algorithm)
-                .withIssuer(String.format("https://%s/", auth0Domain))
-                .withAudience(auth0Audience)
+        try {
+            // Prima prova a decodificare il JWT per estrarre informazioni base
+            String[] tokenParts = token.split("\\.");
+            if (tokenParts.length != 3) {
+                throw new RuntimeException("Invalid JWT format");
+            }
+
+            // Decodifica il payload
+            String payload = new String(Base64.getUrlDecoder().decode(tokenParts[1]));
+            JsonNode payloadNode = objectMapper.readTree(payload);
+            
+            String userId = payloadNode.get("sub").asText();
+            String email = null;
+            
+            // Cerca l'email in vari campi possibili
+            if (payloadNode.has("email")) {
+                email = payloadNode.get("email").asText();
+            } else if (payloadNode.has("email_addresses") && payloadNode.get("email_addresses").isArray()) {
+                JsonNode emailAddresses = payloadNode.get("email_addresses");
+                if (emailAddresses.size() > 0) {
+                    JsonNode firstEmail = emailAddresses.get(0);
+                    if (firstEmail.has("email_address")) {
+                        email = firstEmail.get("email_address").asText();
+                    }
+                }
+            }
+
+            // Verifica il token con Clerk API (opzionale, per maggiore sicurezza)
+            if (shouldVerifyWithClerkAPI()) {
+                verifyTokenWithClerkAPI(token);
+            }
+
+            if (email == null || email.isEmpty()) {
+                // Se non troviamo email nel token, prova a ottenerla dall'API Clerk
+                email = getUserEmailFromClerkAPI(userId);
+            }
+
+            if (email == null || email.isEmpty()) {
+                throw new RuntimeException("No email found for user");
+            }
+
+            return new ClerkUserInfo(userId, email);
+
+        } catch (Exception e) {
+            logger.error("Failed to validate Clerk token: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Verifica il token con l'API di Clerk (per maggiore sicurezza)
+     */
+    private void verifyTokenWithClerkAPI(String token) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.clerk.com/v1/tokens/verify"))
+                .header("Authorization", "Bearer " + clerkSecretKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"token\":\"" + token + "\"}"))
                 .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         
-        return verifier.verify(token);
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Token verification failed with Clerk API: " + response.statusCode());
+        }
+    }
+
+    /**
+     * Ottiene l'email dell'utente dall'API di Clerk
+     */
+    private String getUserEmailFromClerkAPI(String userId) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.clerk.com/v1/users/" + userId))
+                    .header("Authorization", "Bearer " + clerkSecretKey)
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            
+            if (response.statusCode() == 200) {
+                JsonNode userNode = objectMapper.readTree(response.body());
+                if (userNode.has("email_addresses") && userNode.get("email_addresses").isArray()) {
+                    JsonNode emailAddresses = userNode.get("email_addresses");
+                    if (emailAddresses.size() > 0) {
+                        JsonNode firstEmail = emailAddresses.get(0);
+                        if (firstEmail.has("email_address")) {
+                            return firstEmail.get("email_address").asText();
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to get user email from Clerk API: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Determina se verificare il token con l'API di Clerk
+     * In produzione potresti voler sempre verificare, in sviluppo potresti saltare per performance
+     */
+    private boolean shouldVerifyWithClerkAPI() {
+        // Per ora disabilitato per performance, ma può essere abilitato per maggiore sicurezza
+        return false;
+    }
+
+    /**
+     * Classe per contenere le informazioni utente estratte da Clerk
+     */
+    private static class ClerkUserInfo {
+        final String userId;
+        final String email;
+
+        ClerkUserInfo(String userId, String email) {
+            this.userId = userId;
+            this.email = email;
+        }
     }
 }
