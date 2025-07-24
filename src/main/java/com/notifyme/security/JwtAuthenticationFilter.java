@@ -97,18 +97,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     request.setAttribute("authSubject", userInfo.userId);
                     
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    logger.info("Clerk JWT authentication successful for user: {} ({})", userInfo.email, userInfo.userId);
+                    logger.debug("Clerk JWT authentication successful for user: {} ({})", userInfo.email, userInfo.userId);
+                    logger.debug("Set request attributes - userEmail: {}, authSubject: {}", userInfo.email, userInfo.userId);
                 }
                 
             } catch (Exception e) {
-                logger.error("Clerk JWT authentication failed: {}", e.getMessage());
+                logger.error("Clerk JWT authentication failed for path {}: {}", requestPath, e.getMessage());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.getWriter().write("{\"error\":\"Invalid or expired token\",\"success\":false}");
                 return;
             }
         } else {
-            logger.warn("No valid Authorization header found for request: {}", requestPath);
+            logger.warn("No valid Authorization header found for protected request: {}", requestPath);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"Authorization token required\",\"success\":false}");
@@ -173,11 +174,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (email == null || email.isEmpty()) {
                 throw new RuntimeException("No email found for user");
             }
+            
+            logger.debug("Successfully extracted user info from Clerk token - userId: {}, email: {}", userId, email);
 
             return new ClerkUserInfo(userId, email);
 
         } catch (Exception e) {
-            logger.error("Failed to validate Clerk token: {}", e.getMessage());
+            logger.error("Failed to validate Clerk token: {}", e.getMessage(), e);
             throw e;
         }
     }

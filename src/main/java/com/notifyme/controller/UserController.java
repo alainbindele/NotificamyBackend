@@ -38,9 +38,17 @@ public class UserController {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -77,9 +85,17 @@ public class UserController {
         try {
             String currentUserEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (currentUserEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", currentUserEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(currentUserEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", currentUserEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -162,9 +178,17 @@ public class UserController {
             String userId = authentication != null ? authentication.getName() : "unknown";
             
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -197,9 +221,17 @@ public class UserController {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -261,9 +293,17 @@ public class UserController {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }

@@ -36,11 +36,20 @@ public class QueryController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<TQuery>>> getUserQueries(HttpServletRequest request) {
         try {
+            // Estrai informazioni utente dalla richiesta (impostate dal JwtAuthenticationFilter)
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -65,9 +74,17 @@ public class QueryController {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -93,9 +110,17 @@ public class QueryController {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -134,9 +159,17 @@ public class QueryController {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -165,9 +198,17 @@ public class QueryController {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
@@ -198,9 +239,17 @@ public class QueryController {
         try {
             String userEmail = (String) request.getAttribute("userEmail");
             String authSubject = (String) request.getAttribute("authSubject");
+            
+            if (userEmail == null || authSubject == null) {
+                logger.error("Missing user information in request attributes - userEmail: {}, authSubject: {}", userEmail, authSubject);
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("User authentication information missing"));
+            }
+            
             TUser user = userService.findOrCreateUserByEmailAndSubject(userEmail, authSubject);
             
             if (user == null) {
+                logger.error("User not found or could not be created for email: {}, subject: {}", userEmail, authSubject);
                 return ResponseEntity.badRequest()
                         .body(ApiResponse.error("User not found"));
             }
