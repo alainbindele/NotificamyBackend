@@ -33,4 +33,13 @@ public class ChatGptRequest {
         this.utcTimestamp = null;
         this.userTimestamp = null;
     }
+    
+    // Costruttore completo con tutti i parametri
+    public ChatGptRequest(String policy, String clientPrompt, String userTimezone, String utcTimestamp, String userTimestamp) {
+        this.policy = policy;
+        this.clientPrompt = clientPrompt;
+        this.userTimezone = userTimezone;
+        this.utcTimestamp = utcTimestamp;
+        this.userTimestamp = userTimestamp;
+    }
 }
