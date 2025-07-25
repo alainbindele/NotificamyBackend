@@ -46,6 +46,13 @@ public class QueryService {
     }
     
     /**
+     * Salva una query esistente
+     */
+    public TQuery saveQuery(TQuery query) {
+        return queryRepository.save(query);
+    }
+    
+    /**
      * Crea una query di fallback quando il parsing della risposta ChatGPT fallisce
      */
     public TQuery createFallbackQuery(TUser user, String prompt, String userTimezone) {

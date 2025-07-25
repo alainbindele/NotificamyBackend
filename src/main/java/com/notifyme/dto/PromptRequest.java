@@ -24,9 +24,11 @@ public class PromptRequest {
     @Size(max = 100, message = "Email cannot exceed 100 characters")
     private String email;
     
+    // Lista dei canali da abilitare per questa notifica specifica
     @Size(max = 10, message = "Too many notification channels")
     private List<@Size(max = 20, message = "Channel name too long") String> channels;
     
+    // Configurazioni specifiche per i canali (opzionale, sovrascrive quelle dell'utente)
     @Valid
     private Map<@Size(max = 20, message = "Channel key too long") String, 
                @Size(max = 500, message = "Channel configuration too long") String> channelConfigs;

@@ -99,6 +99,7 @@ public class PromptController {
                 if (request.getChannels() != null && !request.getChannels().isEmpty()) {
                     userService.updateUserChannels(user, request.getChannels(), sanitizedChannelConfigs);
                     user = userService.saveUser(user);
+                    logger.info("Updated user {} notification channels: {}", user.getEmail(), request.getChannels());
                 }
                 
                 logger.info("User found/created with ID: {}, email: {} and subject: {} with notification channels updated", 
@@ -132,14 +133,21 @@ public class PromptController {
                     if (user != null) {
                         var savedQuery = queryService.createQuery(user, sanitizedPrompt, validationResponse, request.getTimezone());
                         
-                        // Update query with enabled channels
+                        // Save enabled channels as JSON in the query
                         if (request.getChannels() != null && !request.getChannels().isEmpty()) {
                             try {
-                                savedQuery.setEnabledChannels(objectMapper.writeValueAsString(request.getChannels()));
-                                logger.info("Updated query {} with enabled channels: {}", savedQuery.getId(), request.getChannels());
+                                String enabledChannelsJson = objectMapper.writeValueAsString(request.getChannels());
+                                savedQuery.setEnabledChannels(enabledChannelsJson);
+                                savedQuery = queryService.saveQuery(savedQuery);
+                                logger.info("Saved query {} with enabled channels: {} -> JSON: {}", 
+                                           savedQuery.getId(), request.getChannels(), enabledChannelsJson);
                             } catch (Exception e) {
-                                logger.warn("Failed to serialize enabled channels: {}", e.getMessage());
+                                logger.error("Failed to serialize enabled channels for query {}: {}", 
+                                           savedQuery.getId(), e.getMessage());
+                                // Non fallire la richiesta per questo errore
                             }
+                        } else {
+                            logger.info("No channels specified for query {}, using user's default channels", savedQuery.getId());
                         }
                         
                         logger.info("Query saved successfully for user: {} with full ChatGPT validation data", emailToSave);
