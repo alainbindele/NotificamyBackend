@@ -37,6 +37,9 @@ public class TUser {
     @Column(name = "auth_subject", length = 255)
     private String authSubject; // JWT subject per riconoscimento futuro
     
+    @Column(name = "display_name", length = 100)
+    private String displayName;
+    
     public TUser(String email) {
         this.email = email;
         this.createdAt = LocalDateTime.now();
