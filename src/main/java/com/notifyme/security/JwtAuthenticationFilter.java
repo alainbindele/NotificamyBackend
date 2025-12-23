@@ -9,7 +9,6 @@ import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,31 +45,49 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private String logtoIssuer;
 
     private ConfigurableJWTProcessor<SecurityContext> jwtProcessor;
+    private boolean initialized = false;
+    private boolean logtoConfigured = false;
 
-    @PostConstruct
-    public void init() throws Exception {
+    private synchronized void initializeIfNeeded() {
+        if (initialized) {
+            return;
+        }
+
+        initialized = true;
+
         if (logtoEndpoint == null || logtoEndpoint.equals("https://not-configured.logto.app") ||
             logtoAppId == null || logtoAppId.equals("not-configured")) {
             logger.warn("Logto authentication is not configured. JWT validation will be disabled.");
             logger.warn("Please set LOGTO_ENDPOINT and LOGTO_APP_ID environment variables.");
+            logtoConfigured = false;
             return;
         }
 
-        String issuer = (logtoIssuer != null && !logtoIssuer.isEmpty()) ? logtoIssuer : logtoEndpoint + "/oidc";
-        String jwksUrl = logtoEndpoint + "/oidc/jwks";
+        try {
+            String issuer = (logtoIssuer != null && !logtoIssuer.isEmpty()) ? logtoIssuer : logtoEndpoint + "/oidc";
+            String jwksUrl = logtoEndpoint + "/oidc/jwks";
 
-        logger.info("Initializing Logto JWT processor with issuer: {} and JWKS URL: {}", issuer, jwksUrl);
+            logger.info("Initializing Logto JWT processor with issuer: {} and JWKS URL: {}", issuer, jwksUrl);
 
-        jwtProcessor = new DefaultJWTProcessor<>();
-        JWKSource<SecurityContext> keySource = new RemoteJWKSet<>(new URL(jwksUrl));
-        JWSAlgorithm expectedJWSAlg = JWSAlgorithm.RS256;
-        JWSKeySelector<SecurityContext> keySelector = new JWSVerificationKeySelector<>(expectedJWSAlg, keySource);
-        jwtProcessor.setJWSKeySelector(keySelector);
+            jwtProcessor = new DefaultJWTProcessor<>();
+            JWKSource<SecurityContext> keySource = new RemoteJWKSet<>(new URL(jwksUrl));
+            JWSAlgorithm expectedJWSAlg = JWSAlgorithm.RS256;
+            JWSKeySelector<SecurityContext> keySelector = new JWSVerificationKeySelector<>(expectedJWSAlg, keySource);
+            jwtProcessor.setJWSKeySelector(keySelector);
+
+            logtoConfigured = true;
+            logger.info("Logto JWT processor initialized successfully");
+        } catch (Exception e) {
+            logger.error("Failed to initialize Logto JWT processor: {}", e.getMessage(), e);
+            logtoConfigured = false;
+        }
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                   FilterChain filterChain) throws ServletException, IOException {
+
+        initializeIfNeeded();
 
         String requestPath = request.getRequestURI();
         String method = request.getMethod();
@@ -101,7 +118,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (authorizationHeader != null && authorizationHeader.startsWith(BEARER_PREFIX)) {
             String token = authorizationHeader.substring(BEARER_PREFIX.length());
 
-            if (jwtProcessor == null) {
+            if (!logtoConfigured || jwtProcessor == null) {
                 logger.error("JWT processor not initialized. Logto authentication is not configured.");
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
