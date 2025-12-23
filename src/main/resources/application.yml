@@ -48,9 +48,9 @@ spring:
 
 # Logto Configuration
 logto:
-  endpoint: ${LOGTO_ENDPOINT}
-  app-id: ${LOGTO_APP_ID}
-  issuer: ${LOGTO_ISSUER:${LOGTO_ENDPOINT}/oidc}
+  endpoint: ${LOGTO_ENDPOINT:https://not-configured.logto.app}
+  app-id: ${LOGTO_APP_ID:not-configured}
+  issuer: ${LOGTO_ISSUER:}
 
 # OpenAI Configuration
 openai:

@@ -36,9 +36,17 @@ LOGTO_ENDPOINT=https://your-tenant.logto.app
 LOGTO_APP_ID=your_app_id_here
 ```
 
+Oppure esporta le variabili d'ambiente direttamente:
+
+```bash
+export LOGTO_ENDPOINT=https://your-tenant.logto.app
+export LOGTO_APP_ID=your_app_id_here
+```
+
 **Note**:
 - Il campo `LOGTO_ISSUER` è opzionale. Se non specificato, il sistema userà automaticamente `${LOGTO_ENDPOINT}/oidc`
 - Non è necessario `LOGTO_APP_SECRET` - la validazione JWT usa JWKS (chiavi pubbliche)
+- **L'applicazione può avviarsi anche senza configurazione Logto**, ma mostrerà un warning e tutti gli endpoint protetti restituiranno 401
 
 ### Passo 3: Configurare Logto sul Frontend
 

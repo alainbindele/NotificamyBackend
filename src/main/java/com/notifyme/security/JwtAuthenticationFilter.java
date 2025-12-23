@@ -49,7 +49,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @PostConstruct
     public void init() throws Exception {
-        String issuer = logtoIssuer != null ? logtoIssuer : logtoEndpoint + "/oidc";
+        if (logtoEndpoint == null || logtoEndpoint.equals("https://not-configured.logto.app") ||
+            logtoAppId == null || logtoAppId.equals("not-configured")) {
+            logger.warn("Logto authentication is not configured. JWT validation will be disabled.");
+            logger.warn("Please set LOGTO_ENDPOINT and LOGTO_APP_ID environment variables.");
+            return;
+        }
+
+        String issuer = (logtoIssuer != null && !logtoIssuer.isEmpty()) ? logtoIssuer : logtoEndpoint + "/oidc";
         String jwksUrl = logtoEndpoint + "/oidc/jwks";
 
         logger.info("Initializing Logto JWT processor with issuer: {} and JWKS URL: {}", issuer, jwksUrl);
@@ -93,6 +100,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (authorizationHeader != null && authorizationHeader.startsWith(BEARER_PREFIX)) {
             String token = authorizationHeader.substring(BEARER_PREFIX.length());
+
+            if (jwtProcessor == null) {
+                logger.error("JWT processor not initialized. Logto authentication is not configured.");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Authentication not configured\",\"success\":false}");
+                return;
+            }
 
             try {
                 LogtoUserInfo userInfo = validateLogtoToken(token);
@@ -143,7 +158,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             JWTClaimsSet claimsSet = jwtProcessor.process(token, null);
 
-            String issuer = logtoIssuer != null ? logtoIssuer : logtoEndpoint + "/oidc";
+            String issuer = (logtoIssuer != null && !logtoIssuer.isEmpty()) ? logtoIssuer : logtoEndpoint + "/oidc";
             if (!issuer.equals(claimsSet.getIssuer())) {
                 throw new RuntimeException("Invalid issuer: " + claimsSet.getIssuer());
             }
