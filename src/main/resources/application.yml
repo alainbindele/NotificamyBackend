@@ -50,7 +50,6 @@ spring:
 logto:
   endpoint: ${LOGTO_ENDPOINT}
   app-id: ${LOGTO_APP_ID}
-  app-secret: ${LOGTO_APP_SECRET:}
   issuer: ${LOGTO_ISSUER:${LOGTO_ENDPOINT}/oidc}
 
 # OpenAI Configuration

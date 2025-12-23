@@ -19,11 +19,12 @@ Il backend è stato migrato da Clerk a Logto per l'autenticazione. Le modifiche 
 ### Passo 1: Ottenere le credenziali Logto
 
 1. Accedi alla tua console Logto (https://cloud.logto.io o self-hosted)
-2. Crea una nuova applicazione (tipo: "Traditional Web" o "Machine to Machine")
+2. Crea una nuova applicazione (tipo: "Single Page Application" o "Traditional Web")
 3. Prendi nota di:
    - **Endpoint**: L'URL dell'istanza Logto (es. `https://your-tenant.logto.app`)
    - **App ID**: L'identificatore dell'applicazione
-   - **App Secret**: Il secret dell'applicazione (opzionale per validazione JWT)
+
+**Nota**: Non è necessario un App Secret. Il backend valida i JWT usando le chiavi pubbliche JWKS di Logto.
 
 ### Passo 2: Configurare le variabili d'ambiente
 
@@ -33,10 +34,11 @@ Aggiorna il file `.env` con le tue credenziali Logto:
 # Logto Configuration
 LOGTO_ENDPOINT=https://your-tenant.logto.app
 LOGTO_APP_ID=your_app_id_here
-LOGTO_APP_SECRET=your_app_secret_here
 ```
 
-**Nota**: Il campo `LOGTO_ISSUER` è opzionale. Se non specificato, il sistema userà automaticamente `${LOGTO_ENDPOINT}/oidc`.
+**Note**:
+- Il campo `LOGTO_ISSUER` è opzionale. Se non specificato, il sistema userà automaticamente `${LOGTO_ENDPOINT}/oidc`
+- Non è necessario `LOGTO_APP_SECRET` - la validazione JWT usa JWKS (chiavi pubbliche)
 
 ### Passo 3: Configurare Logto sul Frontend
 
