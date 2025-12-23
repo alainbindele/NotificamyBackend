@@ -44,7 +44,6 @@ public class SecurityConfig {
                 // Tutto il resto permesso (per il frontend)
                 .anyRequest().permitAll()
             )
-            // Usa il filtro JWT personalizzato per Clerk
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -53,8 +52,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
-        // Configurazione CORS per Clerk
+
         configuration.setAllowedOrigins(List.of(
             "https://notificamy.com",
             "https://www.notificamy.com",
